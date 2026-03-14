@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>MSX TETRIS 4P</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a0a;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  min-height:100vh;
+}
+.wrapper { display:flex; flex-direction:column; align-items:center; gap:10px; }
+.legend { color:#444; font-size:10px; letter-spacing:1px; font-family:monospace; }
+.legend b { color:#777; }
+canvas {
+  display:block; image-rendering:pixelated;
+  width:768px; height:576px;
+  border:2px solid #222;
+  box-shadow: 0 0 0 8px #111, 0 0 60px #000;
+  cursor:pointer;
+}
+.controls { display:flex; gap:32px; color:#333; font-size:9px; letter-spacing:1px; font-family:monospace; }
+.controls .key { color:#555; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="legend">MSX · TMS9918A · 256×192px · 4×64px = 256px exactos · sin divisores · <b>8×20</b></div>
+  <canvas id="c" width="256" height="192" tabindex="0"></canvas>
+  <div class="controls">
+    <div><span class="key">P1 ← → ↑ ↓</span></div>
+    <div><span class="key">P2 A D W S</span></div>
+    <div><span class="key">P3 , . I K</span></div>
+    <div><span class="key">P4 AUTO</span></div>
+  </div>
+</div>
+<script>
+const PAL={
+  BLACK:[0,0,0],MGREEN:[62,184,73],LGREEN:[116,208,125],
+  DBLUE:[89,85,224],LBLUE:[128,118,241],DRED:[185,94,81],
+  CYAN:[101,219,239],MRED:[219,101,89],LRED:[255,137,125],
+  DYELLOW:[204,195,94],LYELLOW:[222,208,135],DGREEN:[58,162,65],
+  MAGENTA:[183,102,181],GRAY:[204,204,204],WHITE:[255,255,255],
+};
+
+// 4 fondos oscuros TMS9918A — el contraste entre ellos ES el divisor
+const PCOLORS=[
+  {bg:PAL.DBLUE,   block:PAL.CYAN,    sh:PAL.DBLUE,   txt:PAL.LBLUE  },
+  {bg:PAL.DRED,    block:PAL.LRED,    sh:PAL.DRED,    txt:PAL.MRED   },
+  {bg:PAL.DGREEN,  block:PAL.LGREEN,  sh:PAL.DGREEN,  txt:PAL.MGREEN },
+  {bg:PAL.MAGENTA, block:PAL.LYELLOW, sh:PAL.MAGENTA, txt:PAL.DYELLOW},
+];
+const PLABELS=['P1','P2','P3','P4'];
+
+// 4 tiras × 64px = 256px exactos
+// Cada tira: 8 chars × 8px = 64px
+// Cabecera: 4 chars × 8px = 32px
+// Tablero:  8 cols × 8px = 64px ancho, 20 filas × 8px = 160px alto
+// 32 + 160 = 192px exactos
+const STRIP_W = 64;
+const BOARD_W  = 8;
+const BOARD_H  = 20;
+const HEADER   = 32;
+
+const PIECES=[
+  [[[1,1,1,1]],[[1],[1],[1],[1]]],
+  [[[1,1],[1,1]]],
+  [[[0,1,0],[1,1,1]],[[1,0],[1,1],[1,0]],[[1,1,1],[0,1,0]],[[0,1],[1,1],[0,1]]],
+  [[[0,1,1],[1,1,0]],[[1,0],[1,1],[0,1]]],
+  [[[1,1,0],[0,1,1]],[[0,1],[1,1],[1,0]]],
+  [[[1,0],[1,0],[1,1]],[[1,1,1],[1,0,0]],[[1,1],[0,1],[0,1]],[[0,0,1],[1,1,1]]],
+  [[[0,1],[0,1],[1,1]],[[1,0,0],[1,1,1]],[[1,1],[1,0],[1,0]],[[1,1,1],[0,0,1]]],
+];
+
+class Player {
+  constructor(idx){
+    this.idx=idx;
+    this.board=Array.from({length:BOARD_H},()=>Array(BOARD_W).fill(0));
+    this.score=0;this.level=1;this.lines=0;this.dead=false;
+    this.flashRows=[];this.flashTimer=0;this.dropTimer=0;this.dropInterval=48;
+    this.spawn();
+  }
+  spawn(){
+    this.pieceIdx=Math.floor(Math.random()*PIECES.length);
+    this.rot=0;this.px=Math.floor(BOARD_W/2)-1;this.py=0;
+    this.nextIdx=Math.floor(Math.random()*PIECES.length);
+    if(!this.valid(this.shape(),this.px,this.py))this.dead=true;
+  }
+  shape(r){r=r??this.rot;const rots=PIECES[this.pieceIdx];return rots[r%rots.length];}
+  valid(s,x,y){
+    for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]){
+      const nx=x+c,ny=y+r;
+      if(nx<0||nx>=BOARD_W||ny>=BOARD_H)return false;
+      if(ny>=0&&this.board[ny][nx])return false;
+    }return true;
+  }
+  move(dx){if(this.dead||this.flashTimer>0)return;if(this.valid(this.shape(),this.px+dx,this.py))this.px+=dx;}
+  rotate(){
+    if(this.dead||this.flashTimer>0)return;
+    const rots=PIECES[this.pieceIdx];const nr=(this.rot+1)%rots.length;
+    if(this.valid(this.shape(nr),this.px,this.py))this.rot=nr;
+    else if(this.valid(this.shape(nr),this.px-1,this.py)){this.px--;this.rot=nr;}
+    else if(this.valid(this.shape(nr),this.px+1,this.py)){this.px++;this.rot=nr;}
+  }
+  drop(){
+    if(this.dead||this.flashTimer>0)return;
+    if(this.valid(this.shape(),this.px,this.py+1))this.py++;else this.lock();
+  }
+  lock(){
+    const s=this.shape();
+    for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)
+      if(s[r][c]&&this.py+r>=0)this.board[this.py+r][this.px+c]=this.idx+1;
+    const full=[];
+    for(let r=0;r<BOARD_H;r++)if(this.board[r].every(v=>v>0))full.push(r);
+    if(full.length>0){
+      this.flashRows=full;this.flashTimer=20;
+      const pts=[0,100,300,600,1000];
+      this.score+=pts[full.length]*this.level;
+      this.lines+=full.length;this.level=Math.floor(this.lines/10)+1;
+      this.dropInterval=Math.max(8,48-this.level*4);
+    }else this.spawn();
+  }
+  clearLines(){
+    for(const r of this.flashRows.sort((a,b)=>b-a)){
+      this.board.splice(r,1);this.board.unshift(Array(BOARD_W).fill(0));
+    }
+    this.flashRows=[];this.spawn();
+  }
+  update(){
+    if(this.dead)return;
+    if(this.flashTimer>0){this.flashTimer--;if(this.flashTimer===0)this.clearLines();return;}
+    this.dropTimer++;if(this.dropTimer>=this.dropInterval){this.dropTimer=0;this.drop();}
+  }
+  aiTick(frame){
+    if(this.dead||this.flashTimer>0)return;if(frame%8!==0)return;
+    let best=-Infinity,bestX=this.px,bestR=this.rot;
+    const rots=PIECES[this.pieceIdx].length;
+    for(let r=0;r<rots;r++){const s=this.shape(r);for(let x=-1;x<=BOARD_W;x++){
+      if(!this.valid(s,x,this.py))continue;
+      let y=this.py;while(this.valid(s,x,y+1))y++;
+      const sc=this.evalPos(s,x,y);if(sc>best){best=sc;bestX=x;bestR=r;}
+    }}
+    if(bestR!==this.rot){this.rot=bestR%rots;return;}
+    if(bestX<this.px)this.move(-1);else if(bestX>this.px)this.move(1);else this.drop();
+  }
+  evalPos(s,x,y){
+    const b=this.board.map(r=>[...r]);
+    for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]&&y+r>=0)b[y+r][x+c]=1;
+    let maxH=0,holes=0;
+    for(let c=0;c<BOARD_W;c++){let f=false;for(let r=0;r<BOARD_H;r++){
+      if(b[r][c]){f=true;maxH=Math.max(maxH,BOARD_H-r);}else if(f)holes++;
+    }}
+    let lines=0;for(let r=0;r<BOARD_H;r++)if(b[r].every(v=>v>0))lines++;
+    const heights=[];
+    for(let c=0;c<BOARD_W;c++){let h=0;for(let r=0;r<BOARD_H;r++)if(b[r][c]){h=BOARD_H-r;break;}heights.push(h);}
+    let bump=0;for(let i=0;i<heights.length-1;i++)bump+=Math.abs(heights[i]-heights[i+1]);
+    return lines*200-holes*150-bump*20-maxH*10;
+  }
+}
+
+const cv=document.getElementById('c');
+const ctx=cv.getContext('2d');
+const img=ctx.createImageData(256,192);
+const data=img.data;
+for(let i=3;i<data.length;i+=4)data[i]=255;
+
+function px(x,y,rgb){if(x<0||x>=256||y<0||y>=192)return;const i=(y*256+x)*4;data[i]=rgb[0];data[i+1]=rgb[1];data[i+2]=rgb[2];data[i+3]=255;}
+function rect(x,y,w,h,rgb){for(let dy=0;dy<h;dy++)for(let dx=0;dx<w;dx++)px(x+dx,y+dy,rgb);}
+function hline(x,y,w,rgb){for(let i=0;i<w;i++)px(x+i,y,rgb);}
+function vline(x,y,h,rgb){for(let i=0;i<h;i++)px(x,y+i,rgb);}
+
+const F={
+  '0':[[1,1,1],[1,0,1],[1,0,1],[1,0,1],[1,1,1]],'1':[[0,1,0],[1,1,0],[0,1,0],[0,1,0],[1,1,1]],
+  '2':[[1,1,1],[0,0,1],[0,1,0],[1,0,0],[1,1,1]],'3':[[1,1,1],[0,0,1],[0,1,1],[0,0,1],[1,1,1]],
+  '4':[[1,0,1],[1,0,1],[1,1,1],[0,0,1],[0,0,1]],'5':[[1,1,1],[1,0,0],[1,1,1],[0,0,1],[1,1,1]],
+  '6':[[1,1,1],[1,0,0],[1,1,1],[1,0,1],[1,1,1]],'7':[[1,1,1],[0,0,1],[0,1,0],[0,1,0],[0,1,0]],
+  '8':[[1,1,1],[1,0,1],[1,1,1],[1,0,1],[1,1,1]],'9':[[1,1,1],[1,0,1],[1,1,1],[0,0,1],[1,1,1]],
+  'P':[[1,1,0],[1,0,1],[1,1,0],[1,0,0],[1,0,0]],'S':[[0,1,1],[1,0,0],[0,1,0],[0,0,1],[1,1,0]],
+  'L':[[1,0,0],[1,0,0],[1,0,0],[1,0,0],[1,1,1]],'N':[[1,0,1],[1,1,1],[1,1,1],[1,0,1],[1,0,1]],
+  'E':[[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,1,1]],'A':[[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+  'O':[[0,1,0],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],'R':[[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
+  ' ':[[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]],'V':[[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
+  'G':[[0,1,1],[1,0,0],[1,0,1],[1,0,1],[0,1,1]],'M':[[1,0,1],[1,1,1],[1,0,1],[1,0,1],[1,0,1]],
+  'I':[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],'T':[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[0,1,0]],
+  'K':[[1,0,1],[1,1,0],[1,1,0],[1,0,1],[1,0,1]],'C':[[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],
+  'X':[[1,0,1],[0,1,0],[0,1,0],[0,1,0],[1,0,1]],'W':[[1,0,1],[1,0,1],[1,1,1],[1,1,1],[1,0,1]],
+};
+function chr(ch,cx,cy,fg,bg){
+  const g=F[ch.toUpperCase()]||F[' '];
+  if(bg)rect(cx,cy,8,8,bg);
+  for(let row=0;row<5;row++)for(let col=0;col<3;col++){
+    if(g[row][col])px(cx+2+col,cy+1+row,fg);
+    else if(bg)px(cx+2+col,cy+1+row,bg);
+  }
+}
+function txt(str,cx,cy,fg,bg){for(let i=0;i<str.length;i++)chr(str[i],cx+i*8,cy,fg,bg);}
+
+function block(bx,by,col,sh,flash){
+  if(flash){rect(bx,by,8,8,PAL.WHITE);return;}
+  rect(bx,by,8,8,col);
+  hline(bx,by,8,PAL.WHITE);vline(bx,by,8,PAL.WHITE);
+  hline(bx,by+7,8,sh);vline(bx+7,by,8,sh);
+}
+function smallBlock(bx,by,col,sh){
+  rect(bx,by,4,4,col);
+  px(bx,by,PAL.WHITE);px(bx+1,by,PAL.WHITE);px(bx,by+1,PAL.WHITE);
+  px(bx+3,by+3,sh);px(bx+2,by+3,sh);px(bx+3,by+2,sh);
+}
+
+function renderPlayer(p,sx){
+  const pc=PCOLORS[p.idx];
+
+  // Fondo completo — sin divisores, el contraste de colores separa las tiras
+  rect(sx,0,STRIP_W,192,pc.bg);
+
+  if(p.dead){
+    rect(sx,0,STRIP_W,192,PAL.DRED);
+    txt('GAME',sx+16,88,PAL.WHITE,PAL.DRED);
+    txt('OVER',sx+16,100,PAL.WHITE,PAL.DRED);
+    return;
+  }
+
+  // ── Cabecera: 4 filas × 8px = 32px ───────────────────
+  // Fila 0 (y=0):  P1__ S12345
+  txt(PLABELS[p.idx],sx,0,PAL.WHITE,pc.bg);
+  txt('S',sx+16,0,pc.txt,pc.bg);
+  txt(String(p.score).padStart(5,'0'),sx+24,0,PAL.WHITE,pc.bg);
+
+  // Fila 1 (y=8):  LV00 NX[pieza]
+  txt('LV',sx,8,pc.txt,pc.bg);
+  txt(String(p.level).padStart(2,'0'),sx+16,8,PAL.WHITE,pc.bg);
+  txt('NX',sx+32,8,pc.txt,pc.bg);
+  const ns=PIECES[p.nextIdx][0];
+  const nox=sx+48+(8-(ns[0].length*4))/2;
+  const noy=8+(8-(ns.length*4))/2;
+  for(let r=0;r<ns.length;r++)for(let c=0;c<ns[r].length;c++)
+    if(ns[r][c])smallBlock(nox+c*4,noy+r*4,pc.block,pc.sh);
+
+  // Fila 2 (y=16): LN000
+  txt('LN',sx,16,pc.txt,pc.bg);
+  txt(String(p.lines).padStart(3,'0'),sx+16,16,PAL.WHITE,pc.bg);
+
+  // Fila 3 (y=24): separador usando chars del color del bloque
+  rect(sx,24,STRIP_W,8,pc.block);
+
+  // ── Tablero: 8 cols × 20 filas desde y=32 ────────────
+  // 8×8 = 64px ancho exacto, 20×8 = 160px alto, 32+160 = 192px exacto
+  for(let r=0;r<BOARD_H;r++){
+    const fl=p.flashRows.includes(r)&&(p.flashTimer%4<2);
+    for(let c=0;c<BOARD_W;c++){
+      if(p.board[r][c]){
+        const pc2=PCOLORS[p.board[r][c]-1];
+        block(sx+c*8,HEADER+r*8,pc2.block,pc2.sh,fl);
+      }
+    }
+  }
+
+  // ── Pieza activa + ghost ──────────────────────────────
+  if(p.flashTimer===0){
+    const s=p.shape();
+    // Ghost
+    let gy=p.py;while(p.valid(s,p.px,gy+1))gy++;
+    if(gy>p.py)for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]){
+      const gbx=sx+(p.px+c)*8,gby=HEADER+(gy+r)*8;
+      if(gy+r>=0&&gy+r<BOARD_H){
+        hline(gbx,gby,8,pc.block);hline(gbx,gby+7,8,pc.block);
+        vline(gbx,gby,8,pc.block);vline(gbx+7,gby,8,pc.block);
+      }
+    }
+    // Pieza
+    for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c])
+      if(p.py+r>=0)block(sx+(p.px+c)*8,HEADER+(p.py+r)*8,pc.block,pc.sh,false);
+  }
+}
+
+const players=[new Player(0),new Player(1),new Player(2),new Player(3)];
+const keys={};
+cv.addEventListener('click',()=>cv.focus());
+cv.addEventListener('keydown',e=>{
+  if(keys[e.code])return;keys[e.code]=true;
+  if(e.code==='ArrowLeft') players[0].move(-1);
+  if(e.code==='ArrowRight')players[0].move(1);
+  if(e.code==='ArrowUp')   players[0].rotate();
+  if(e.code==='ArrowDown') players[0].drop();
+  if(e.code==='KeyA')players[1].move(-1);
+  if(e.code==='KeyD')players[1].move(1);
+  if(e.code==='KeyW')players[1].rotate();
+  if(e.code==='KeyS')players[1].drop();
+  if(e.code==='Comma') players[2].move(-1);
+  if(e.code==='Period')players[2].move(1);
+  if(e.code==='KeyI')  players[2].rotate();
+  if(e.code==='KeyK')  players[2].drop();
+  e.preventDefault();
+});
+cv.addEventListener('keyup',e=>{keys[e.code]=false;});
+
+let frame=0;
+function loop(){
+  players[0].update();
+  players[1].update();
+  players[2].aiTick(frame);players[2].update();
+  players[3].aiTick(frame);players[3].update();
+  data.fill(0);for(let i=3;i<data.length;i+=4)data[i]=255;
+  renderPlayer(players[0],0);
+  renderPlayer(players[1],64);
+  renderPlayer(players[2],128);
+  renderPlayer(players[3],192);
+  ctx.putImageData(img,0,0);
+  frame++;requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
