@@ -429,3 +429,153 @@ void Render_Frame(void) {
         }
     }
 }
+
+// ============================================================================
+// VICTORY SCREEN — one-shot, called once when winner is determined
+// ============================================================================
+
+// ============================================================================
+// TITLE SCREEN
+// ============================================================================
+
+// Draw a character from g_Font as big blocks (each pixel = 1 block tile)
+// The 3x5 font data sits in bits 5,4,3 of rows 1-5
+static void DrawBigChar(u8 x, u8 y, u8 ch, u8 colorIdx) {
+    u8 idx = (ch >= 32 && ch < 32 + FONT_COUNT) ? ch - 32 : 0;
+    const u8* pat = g_Font[idx];
+    u8 r, c;
+    Tiles_ColorBlock(g_CBuf, colorIdx);
+    for (r = 0; r < 5; r++) {
+        u8 row = pat[r + 1]; // rows 1-5 have the data
+        for (c = 0; c < 3; c++) {
+            if (row & (0x20 >> c))
+                PutTile(x + c, y + r, g_PatBlock, g_CBuf);
+        }
+    }
+}
+
+void Render_TitleScreen(void) {
+    u8 r, c, i, x;
+    u8 colBg[8], colTxt[8];
+
+    // Black background
+    for (i = 0; i < 8; i++)
+        colBg[i] = (u8)((COLOR_BLACK << 4) | COLOR_BLACK);
+    for (r = 0; r < 24; r++)
+        for (c = 0; c < 32; c++)
+            PutTile(c, r, g_PatEmpty, colBg);
+
+    // "TINY" in big blocks — row 1, each letter 3 wide + 1 gap = 15 tiles
+    // Colored like Tetris pieces: T=cyan(P1), I=red(P2), N=green(P3), Y=yellow(P4)
+    x = 8;
+    DrawBigChar(x,    1, 'T', 0);  // cyan
+    DrawBigChar(x+4,  1, 'I', 1);  // red
+    DrawBigChar(x+8,  1, 'N', 2);  // green
+    DrawBigChar(x+12, 1, 'Y', 3);  // yellow
+
+    // "TETRIS" in big blocks — row 7, 6 letters × 4 = 23 tiles
+    x = 4;
+    DrawBigChar(x,    7, 'T', 1);  // red
+    DrawBigChar(x+4,  7, 'E', 0);  // cyan
+    DrawBigChar(x+8,  7, 'T', 3);  // yellow
+    DrawBigChar(x+12, 7, 'R', 2);  // green
+    DrawBigChar(x+16, 7, 'I', 1);  // red
+    DrawBigChar(x+20, 7, 'S', 0);  // cyan
+
+    // "VS" in big blocks — row 13, centered
+    x = 12;
+    DrawBigChar(x,   13, 'V', 3);  // yellow
+    DrawBigChar(x+4, 13, 'S', 1);  // red
+
+    // Player slots in their quadrants (each 8 tiles wide)
+    // Row 20: "Px", Row 21: "PRESS A"
+    for (i = 0; i < NUM_PLAYERS; i++) {
+        u8 colP[8];
+        const PlayerColors* pc = &g_PlayerColors[i];
+        u8 sx = i * 8;
+
+        for (c = 0; c < 8; c++)
+            colP[c] = (u8)((pc->block << 4) | COLOR_BLACK);
+        for (c = 0; c < 8; c++)
+            colTxt[c] = (u8)((pc->text << 4) | COLOR_BLACK);
+
+        // "Px" centered in strip
+        PutTile(sx + 3, 19, g_Font['P'-32], colP);
+        PutTile(sx + 4, 19, g_Font['1'+i-32], colP);
+
+        // "PRESS" on row 21
+        PutTile(sx + 1, 21, g_Font['P'-32], colTxt);
+        PutTile(sx + 2, 21, g_Font['R'-32], colTxt);
+        PutTile(sx + 3, 21, g_Font['E'-32], colTxt);
+        PutTile(sx + 4, 21, g_Font['S'-32], colTxt);
+        PutTile(sx + 5, 21, g_Font['S'-32], colTxt);
+
+        // "A" on row 22
+        PutTile(sx + 3, 22, g_Font['A'-32], colP);
+    }
+}
+
+void Render_TitleReady(u8 pIdx) {
+    u8 colR[8], colBg[8], i, x;
+    const PlayerColors* pc = &g_PlayerColors[pIdx];
+    u8 sx = pIdx * 8;
+
+    for (i = 0; i < 8; i++) {
+        colR[i] = (u8)((pc->block << 4) | COLOR_BLACK);
+        colBg[i] = (u8)((COLOR_BLACK << 4) | COLOR_BLACK);
+    }
+
+    // Clear "PRESS" and "A" rows
+    for (x = sx; x < sx + 8; x++) {
+        PutTile(x, 21, g_PatEmpty, colBg);
+        PutTile(x, 22, g_PatEmpty, colBg);
+    }
+
+    // Write "READY" in player block color on row 21
+    PutTile(sx + 1, 21, g_Font['R'-32], colR);
+    PutTile(sx + 2, 21, g_Font['E'-32], colR);
+    PutTile(sx + 3, 21, g_Font['A'-32], colR);
+    PutTile(sx + 4, 21, g_Font['D'-32], colR);
+    PutTile(sx + 5, 21, g_Font['Y'-32], colR);
+}
+
+void Render_Victory(u8 winnerIdx) {
+    u8 r, c, i, sx;
+    u8 colWin[8], colTxt[8], colBlock[8];
+    const PlayerColors* pc = &g_PlayerColors[winnerIdx];
+
+    // Hide all sprites
+    for (i = 0; i < 32; i++)
+        VDP_SetSpriteSM1(i, 0, 208, 0, 0);
+
+    // Fill entire screen with winner's bg color
+    for (i = 0; i < 8; i++)
+        colWin[i] = (u8)((pc->bg << 4) | pc->bg);
+    for (r = 0; r < 24; r++)
+        for (c = 0; c < 32; c++)
+            PutTile(c, r, g_PatEmpty, colWin);
+
+    // Text colors
+    for (i = 0; i < 8; i++) {
+        colTxt[i] = (u8)((COLOR_WHITE << 4) | pc->bg);
+        colBlock[i] = (u8)((pc->block << 4) | pc->bg);
+    }
+
+    // "PLAYER" centered at row 9
+    sx = 12;
+    PutTile(sx+0, 9, g_Font['P'-32], colTxt);
+    PutTile(sx+1, 9, g_Font['L'-32], colTxt);
+    PutTile(sx+2, 9, g_Font['A'-32], colTxt);
+    PutTile(sx+3, 9, g_Font['Y'-32], colTxt);
+    PutTile(sx+4, 9, g_Font['E'-32], colTxt);
+    PutTile(sx+5, 9, g_Font['R'-32], colTxt);
+    // Player number
+    PutTile(sx+7, 9, g_Font['1' + winnerIdx - 32], colBlock);
+
+    // "WINS" at row 11 in block color
+    sx = 14;
+    PutTile(sx+0, 11, g_Font['W'-32], colBlock);
+    PutTile(sx+1, 11, g_Font['I'-32], colBlock);
+    PutTile(sx+2, 11, g_Font['N'-32], colBlock);
+    PutTile(sx+3, 11, g_Font['S'-32], colBlock);
+}

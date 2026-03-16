@@ -385,3 +385,11 @@ void Game_Init(void) {
         Player_Init(&g_Players[i], i);
     g_Frame = 0;
 }
+
+u8 Game_CheckWinner(void) {
+    u8 i, alive = 0, last = 0;
+    for (i = 0; i < NUM_PLAYERS; i++) {
+        if (!g_Players[i].dead) { alive++; last = i; }
+    }
+    return (alive == 1) ? last : 0xFF;
+}

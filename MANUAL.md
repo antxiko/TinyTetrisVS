@@ -63,7 +63,32 @@ You need exactly three things:
 
 ---
 
-## III. CONTROLS
+## III. THE TITLE SCREEN
+
+When the cartridge boots, you are greeted by the **TINY TETRIS VS** logo — built entirely out of Tetris blocks, glowing in four player colors across the darkness.
+
+Below the logo, four player slots await:
+
+```
+  ┌────────┬────────┬────────┬────────┐
+  │   P1   │   P2   │   P3   │   P4   │
+  │PRESS A │PRESS A │PRESS A │PRESS A │
+  └────────┴────────┴────────┴────────┘
+```
+
+Each player must press their button to join the battle:
+- **Player 1**: Press **SPACE** or **1** on keyboard
+- **Player 2**: Press **BUTTON A** on joystick 2, or **2** on keyboard
+- **Player 3**: Press **BUTTON A** on joystick 3, or **3** on keyboard
+- **Player 4**: Press **BUTTON A** on joystick 4, or **4** on keyboard
+
+When a player joins, their slot changes to **READY** in their player color. When all four are ready, the war begins.
+
+*A different melody plays on the title screen. Enjoy it. It's the last peaceful moment you'll have.*
+
+---
+
+## IV. CONTROLS
 
 ### KEYBOARD WARRIOR (Player 1)
 
@@ -173,6 +198,22 @@ When a player's blocks reach the top, their board turns **dark red** and display
 ```
 
 They're done. Gone. Eliminated. Three must fall for one to rise.
+
+### Step 6: Victory
+
+The moment the third player falls, the game stops. The screen floods with the winner's color. Two words appear:
+
+```
+        ╔════════════════════╗
+        ║                    ║
+        ║    PLAYER X WINS   ║
+        ║                    ║
+        ╚════════════════════╝
+```
+
+A **victory fanfare** erupts from the PSG. Trumpets of triumph. Horns of glory. Well, square waves of glory — but on a Z80, that's the same thing.
+
+After the celebration, the game returns to the title screen. Plug in. Ready up. **Go again.**
 
 ---
 

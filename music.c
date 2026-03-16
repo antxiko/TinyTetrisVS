@@ -1,5 +1,5 @@
 // ____________________________________________________________________________
-// Simple PSG music player — Korobeiniki (Tetris theme)
+// PSG music player — Title, Game (Korobeiniki), Victory
 // AY-3-8910: Channel A = melody, Channel B = bass
 // ____________________________________________________________________________
 
@@ -9,7 +9,6 @@
 
 // ============================================================================
 // Note periods for AY-3-8910 (PAL clock ~1.7734 MHz)
-// Period = 1773400 / (16 * frequency)
 // ============================================================================
 #define REST  0
 
@@ -34,8 +33,10 @@
 
 // Octave 5
 #define C5    212
+#define D5    189
+#define E5    168
 
-// Bass octave 2
+// Bass octave 2-3
 #define A2    1008
 #define B2    898
 #define C3    848
@@ -48,89 +49,186 @@
 // ============================================================================
 // Duration in frames (50Hz). Tempo ~150 BPM → quarter = 20 frames
 // ============================================================================
+#define T16  5    // sixteenth
 #define T8   10   // eighth
 #define T4   20   // quarter
 #define T4D  30   // dotted quarter
 #define T2   40   // half
+#define T1   80   // whole
 
-// ============================================================================
-// Song data: {period, duration} pairs. 0xFFFF marks loop point.
-// ============================================================================
 typedef struct {
     u16 period;
     u8  dur;
 } NoteEntry;
 
-// Melody (Channel A)
-static const NoteEntry g_Melody[] = {
-    // Section A (8 measures)
-    // |E4   B3 C4 |D4   C4 B3 |A3   A3 C4 |E4   D4 C4 |
+// ============================================================================
+// TITLE THEME — Bouncy march in C major (original)
+// ============================================================================
+
+static const NoteEntry g_TitleMel[] = {
+    // Phrase 1: ascending fanfare
+    {C4,T8}, {E4,T8}, {G4,T4}, {G4,T8}, {A4,T8},
+    {G4,T4}, {E4,T4},
+    {C4,T8}, {D4,T8}, {E4,T4}, {E4,T8}, {F4,T8},
+    {E4,T4}, {D4,T4},
+    // Phrase 2: climax and resolve
+    {C4,T8}, {E4,T8}, {G4,T4}, {A4,T8}, {B4,T8},
+    {C5,T4}, {A4,T4},
+    {G4,T8}, {F4,T8}, {E4,T8}, {D4,T8},
+    {C4,T2}, {REST,T4}, {REST,T4},
+};
+
+static const NoteEntry g_TitleBas[] = {
+    {C3,T4}, {C3,T4}, {E3,T4}, {E3,T4},
+    {C3,T4}, {C3,T4},
+    {F3,T4}, {F3,T4}, {G3,T4}, {G3,T4},
+    {G3,T4}, {G3,T4},
+    {C3,T4}, {C3,T4}, {F3,T4}, {F3,T4},
+    {E3,T4}, {F3,T4},
+    {G3,T4}, {G3,T4}, {G3,T4}, {G3,T4},
+    {C3,T2}, {REST,T4}, {REST,T4},
+};
+
+// ============================================================================
+// GAME THEME — Korobeiniki
+// ============================================================================
+
+static const NoteEntry g_GameMel[] = {
+    // Section A
     {E4,T4}, {B3,T8}, {C4,T8}, {D4,T4}, {C4,T8}, {B3,T8},
     {A3,T4}, {A3,T8}, {C4,T8}, {E4,T4}, {D4,T8}, {C4,T8},
-    // |B3.    C4 |D4   E4   |C4   A3   |A3   --   |
     {B3,T4D}, {C4,T8}, {D4,T4}, {E4,T4},
     {C4,T4}, {A3,T4}, {A3,T4}, {REST,T4},
-
-    // Section B (8 measures)
-    // |-- D4.   F4 |A4   G4 F4 |E4.    C4 |E4   D4 C4 |
+    // Section B
     {REST,T8}, {D4,T4D}, {F4,T8}, {A4,T4}, {G4,T8}, {F4,T8},
     {E4,T4D}, {C4,T8}, {E4,T4}, {D4,T8}, {C4,T8},
-    // |B3.    C4 |D4   E4   |C4   A3   |A3   --   |
     {B3,T4D}, {C4,T8}, {D4,T4}, {E4,T4},
     {C4,T4}, {A3,T4}, {A3,T4}, {REST,T4},
-
-    // Ending chord held
+    // Ending
     {E4,T2}, {E4,T2},
     {C4,T2}, {C4,T2},
     {A3,T2}, {A3,T2}, {REST,T4}, {REST,T4},
 };
 
-// Bass (Channel B) — root notes, half notes mostly
-static const NoteEntry g_Bass[] = {
+static const NoteEntry g_GameBas[] = {
     // Section A
-    {E3,T4}, {E3,T4}, {E3,T4}, {E3,T4},    // E minor
-    {A2,T4}, {A2,T4}, {A2,T4}, {A2,T4},    // A minor
-    {Gs3,T4}, {Gs3,T4}, {E3,T4}, {E3,T4},  // G#/E
+    {E3,T4}, {E3,T4}, {E3,T4}, {E3,T4},
+    {A2,T4}, {A2,T4}, {A2,T4}, {A2,T4},
+    {Gs3,T4}, {Gs3,T4}, {E3,T4}, {E3,T4},
     {A2,T4}, {A2,T4}, {A2,T4}, {REST,T4},
-
     // Section B
-    {D3,T4}, {D3,T4}, {D3,T4}, {D3,T4},    // D minor
-    {C3,T4}, {C3,T4}, {C3,T4}, {C3,T4},    // C
-    {Gs3,T4}, {Gs3,T4}, {E3,T4}, {E3,T4},  // G#/E
+    {D3,T4}, {D3,T4}, {D3,T4}, {D3,T4},
+    {C3,T4}, {C3,T4}, {C3,T4}, {C3,T4},
+    {Gs3,T4}, {Gs3,T4}, {E3,T4}, {E3,T4},
     {A2,T4}, {A2,T4}, {A2,T4}, {REST,T4},
-
     // Ending
     {A2,T2}, {A2,T2},
     {A2,T2}, {A2,T2},
     {A2,T2}, {A2,T2}, {REST,T4}, {REST,T4},
 };
 
-#define MELODY_LEN  (sizeof(g_Melody) / sizeof(NoteEntry))
-#define BASS_LEN    (sizeof(g_Bass) / sizeof(NoteEntry))
+// ============================================================================
+// VICTORY FANFARE
+// ============================================================================
 
+static const NoteEntry g_VicMel[] = {
+    {C4,T8}, {E4,T8}, {G4,T8}, {C5,T4},
+    {REST,T8}, {G4,T8}, {C5,T4D},
+    {REST,T8}, {E4,T8}, {G4,T8}, {A4,T4}, {G4,T8}, {E4,T8},
+    {C4,T4}, {E4,T4}, {C4,T2},
+    {REST,T4}, {REST,T4},
+    {C4,T8}, {E4,T8}, {G4,T8}, {C5,T2},
+    {G4,T4}, {E4,T4}, {C4,T2}, {C4,T2},
+    {REST,T2}, {REST,T2},
+};
+
+static const NoteEntry g_VicBas[] = {
+    {C3,T4}, {C3,T4}, {E3,T4}, {C3,T4},
+    {G3,T4}, {G3,T4}, {C3,T4D},
+    {REST,T8}, {C3,T4}, {C3,T4}, {F3,T4}, {G3,T4},
+    {C3,T4}, {G3,T4}, {C3,T2},
+    {REST,T4}, {REST,T4},
+    {C3,T4}, {C3,T4}, {E3,T4}, {C3,T2},
+    {G3,T4}, {C3,T4}, {C3,T2}, {C3,T2},
+    {REST,T2}, {REST,T2},
+};
+
+// ============================================================================
+// Lengths
+// ============================================================================
+#define TITLE_MEL_LEN   (sizeof(g_TitleMel) / sizeof(NoteEntry))
+#define TITLE_BAS_LEN   (sizeof(g_TitleBas) / sizeof(NoteEntry))
+#define GAME_MEL_LEN    (sizeof(g_GameMel) / sizeof(NoteEntry))
+#define GAME_BAS_LEN    (sizeof(g_GameBas) / sizeof(NoteEntry))
+#define VIC_MEL_LEN     (sizeof(g_VicMel) / sizeof(NoteEntry))
+#define VIC_BAS_LEN     (sizeof(g_VicBas) / sizeof(NoteEntry))
+
+// ============================================================================
+// State
+// ============================================================================
+#define MODE_TITLE   0
+#define MODE_GAME    1
+#define MODE_VICTORY 2
+
+static u8 s_mode;
 static u8 s_melIdx;
 static u8 s_basIdx;
 static u8 s_melTimer;
 static u8 s_basTimer;
 
+static const NoteEntry* GetMel(void) {
+    if (s_mode == MODE_VICTORY) return g_VicMel;
+    if (s_mode == MODE_GAME) return g_GameMel;
+    return g_TitleMel;
+}
+static const NoteEntry* GetBas(void) {
+    if (s_mode == MODE_VICTORY) return g_VicBas;
+    if (s_mode == MODE_GAME) return g_GameBas;
+    return g_TitleBas;
+}
+static u8 GetMelLen(void) {
+    if (s_mode == MODE_VICTORY) return VIC_MEL_LEN;
+    if (s_mode == MODE_GAME) return GAME_MEL_LEN;
+    return TITLE_MEL_LEN;
+}
+static u8 GetBasLen(void) {
+    if (s_mode == MODE_VICTORY) return VIC_BAS_LEN;
+    if (s_mode == MODE_GAME) return GAME_BAS_LEN;
+    return TITLE_BAS_LEN;
+}
+
 // ============================================================================
-// INIT
+// INIT — starts with title music
 // ============================================================================
 
-void Music_Init(void) {
-    // Mixer: tone A+B on, noise off on all channels
-    // Bits: noise_C noise_B noise_A tone_C tone_B tone_A (active LOW)
-    PSG_SetRegister(7, 0x3C);  // 00111100 = tone A+B enabled
-
-    // Volumes
-    PSG_SetRegister(8, 12);    // Channel A (melody) volume
-    PSG_SetRegister(9, 9);     // Channel B (bass) volume
-    PSG_SetRegister(10, 0);    // Channel C silent
-
+static void ResetPlayback(void) {
     s_melIdx = 0;
     s_basIdx = 0;
-    s_melTimer = 1;  // Trigger immediately
+    s_melTimer = 1;
     s_basTimer = 1;
+}
+
+void Music_Init(void) {
+    PSG_SetRegister(7, 0x3C);  // tone A+B enabled
+    PSG_SetRegister(8, 12);
+    PSG_SetRegister(9, 9);
+    PSG_SetRegister(10, 0);
+    s_mode = MODE_TITLE;
+    ResetPlayback();
+}
+
+void Music_StartGame(void) {
+    s_mode = MODE_GAME;
+    ResetPlayback();
+    PSG_SetRegister(8, 12);
+    PSG_SetRegister(9, 9);
+}
+
+void Music_Victory(void) {
+    s_mode = MODE_VICTORY;
+    ResetPlayback();
+    PSG_SetRegister(8, 14);
+    PSG_SetRegister(9, 11);
 }
 
 // ============================================================================
@@ -138,18 +236,27 @@ void Music_Init(void) {
 // ============================================================================
 
 void Music_Update(void) {
+    const NoteEntry* mel = GetMel();
+    const NoteEntry* bas = GetBas();
+    u8 melLen = GetMelLen();
+    u8 basLen = GetBasLen();
+    u8 melVol = (s_mode == MODE_VICTORY) ? 14 : 12;
+    u8 basVol = (s_mode == MODE_VICTORY) ? 11 : 9;
+
     // Melody channel A
     s_melTimer--;
     if (s_melTimer == 0) {
-        u16 p = g_Melody[s_melIdx].period;
-        s_melTimer = g_Melody[s_melIdx].dur;
+        u16 p = mel[s_melIdx].period;
+        s_melTimer = mel[s_melIdx].dur;
         s_melIdx++;
-        if (s_melIdx >= MELODY_LEN) s_melIdx = 0;
-
+        if (s_melIdx >= melLen) {
+            if (s_mode == MODE_VICTORY) s_melIdx = melLen - 2;
+            else s_melIdx = 0;
+        }
         if (p > 0) {
             PSG_SetRegister(0, (u8)(p & 0xFF));
             PSG_SetRegister(1, (u8)((p >> 8) & 0x0F));
-            PSG_SetRegister(8, 12);
+            PSG_SetRegister(8, melVol);
         } else {
             PSG_SetRegister(8, 0);
         }
@@ -158,15 +265,17 @@ void Music_Update(void) {
     // Bass channel B
     s_basTimer--;
     if (s_basTimer == 0) {
-        u16 p = g_Bass[s_basIdx].period;
-        s_basTimer = g_Bass[s_basIdx].dur;
+        u16 p = bas[s_basIdx].period;
+        s_basTimer = bas[s_basIdx].dur;
         s_basIdx++;
-        if (s_basIdx >= BASS_LEN) s_basIdx = 0;
-
+        if (s_basIdx >= basLen) {
+            if (s_mode == MODE_VICTORY) s_basIdx = basLen - 2;
+            else s_basIdx = 0;
+        }
         if (p > 0) {
             PSG_SetRegister(2, (u8)(p & 0xFF));
             PSG_SetRegister(3, (u8)((p >> 8) & 0x0F));
-            PSG_SetRegister(9, 9);
+            PSG_SetRegister(9, basVol);
         } else {
             PSG_SetRegister(9, 0);
         }

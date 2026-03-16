@@ -128,6 +128,58 @@ static void DoKeyboardP1(void) {
 // PUBLIC — call every frame
 // ============================================================================
 
+// ============================================================================
+// TITLE SCREEN — check who pressed A/Space (edge-triggered)
+// Returns bitmask: bit 0=P1, bit 1=P2, etc.
+// ============================================================================
+
+static u8 s_titlePrev = 0xFF;
+static u8 s_titleKeyPrev = 0xFF;
+static u8 s_titleJoyPrev[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
+
+u8 Input_TitleCheck(void) {
+    u8 result = 0;
+    u8 row8 = Keyboard_Read(8);
+
+    // P1: Space (bit 0) as confirm
+    {
+        u8 sp = !(row8 & 0x01);
+        u8 psp = !(s_titlePrev & 0x01);
+        if (sp && !psp) result |= 0x01;
+    }
+    s_titlePrev = row8;
+
+    // Debug keys: 1,2,3,4 on keyboard (row 0: bit 1=1, bit 2=2, bit 3=3, bit 4=4)
+    {
+        u8 row0 = Keyboard_Read(0);
+        u8 k;
+        for (k = 0; k < 4; k++) {
+            u8 pressed = !(row0 & (u8)(1 << (k + 1)));
+            u8 prev = !(s_titleKeyPrev & (u8)(1 << (k + 1)));
+            if (pressed && !prev) result |= (u8)(1 << k);
+        }
+        s_titleKeyPrev = row0;
+    }
+
+    // NinjaTap players
+    if (s_ntapPorts >= 2) {
+        u8 p;
+        NTap_Update();
+        for (p = 0; p < 4; p++) {
+            u8 a = NTap_IsPressed(p, NTAP_A);
+            u8 pa = (s_titleJoyPrev[p] & NTAP_A) == 0;
+            if (a && !pa) result |= (u8)(1 << p);
+            s_titleJoyPrev[p] = NTap_GetData(p);
+        }
+    }
+
+    return result;
+}
+
+// ============================================================================
+// PUBLIC — call every frame during gameplay
+// ============================================================================
+
 void Input_GameUpdate(void) {
     if (s_ntapPorts >= 2) {
         // NinjaTap detected — update all joystick states

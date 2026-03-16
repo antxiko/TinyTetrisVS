@@ -72,6 +72,7 @@ typedef struct {
 // API
 // ============================================================================
 void Game_Init(void);
+u8   Game_CheckWinner(void);  // Returns winner index (0-3) or 0xFF if game ongoing
 void Player_Spawn(Player* p);
 u8   Piece_GetBit(u16 bits, u8 row, u8 col);
 const PieceRot* Piece_GetRot(u8 pieceIdx, u8 rot);
