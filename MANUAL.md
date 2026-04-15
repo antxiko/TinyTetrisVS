@@ -76,13 +76,28 @@ Below the logo, four player slots await:
   └────────┴────────┴────────┴────────┘
 ```
 
-Each player must press their button to join the battle:
+Each player who wants to fight must press their button to claim their slot:
 - **Player 1**: Press **SPACE** or **1** on keyboard
 - **Player 2**: Press **BUTTON A** on joystick 2, or **2** on keyboard
 - **Player 3**: Press **BUTTON A** on joystick 3, or **3** on keyboard
 - **Player 4**: Press **BUTTON A** on joystick 4, or **4** on keyboard
 
-When a player joins, their slot changes to **READY** in their player color. When all four are ready, the war begins.
+When a player joins, their slot changes to **READY** in their player color.
+
+### HUMANS VS MACHINES
+
+You don't need four humans. You don't even need two.
+
+The moment the first player joins, an **8-second countdown** begins. When it expires — or when all four slots are claimed — the game starts. **Any unclaimed slot is filled by a CPU opponent**:
+
+```
+  ┌────────┬────────┬────────┬────────┐
+  │   P1   │   P2   │   P3   │   P4   │
+  │ READY  │ READY  │  CPU   │  CPU   │
+  └────────┴────────┴────────┴────────┘
+```
+
+The CPU is no slouch. It evaluates every possible landing, aims for 2-line clears by default, occasionally sets up for 3-liners, and on rare bloodthirsty pieces hunts for a full **Tetris**. It will target you. It will send you garbage. It will laugh in Z80 assembly.
 
 *A different melody plays on the title screen. Enjoy it. It's the last peaceful moment you'll have.*
 
@@ -157,6 +172,28 @@ The screen is divided into four vertical strips. Each strip is one player's doma
 ```
 
 The **colored arrows** floating above the separator line are the targeting cursors. Your arrow shows which opponent you are currently aiming at. Other players' arrows show who *they* are targeting. If you see three arrows pointing at your board — pray.
+
+### THE HUD — FOUR ROWS OF INTEL
+
+Each player's top four rows display critical battlefield data:
+
+```
+  ┌────────────────────┐
+  │ P1 · · · ■■■■      │  <- Row 0: player label + next-piece preview (top)
+  │ 0042       ■ ■     │  <- Row 1: score + next-piece preview (bottom)
+  │ L012    V 3        │  <- Row 2: lines cleared + current level
+  │ ════════════════   │  <- Row 3: separator bar in player color
+  └────────────────────┘
+```
+
+- **Next-piece preview**: the 4×2 block in the top-right shows what piece is coming after the current one. Plan your stack accordingly.
+- **Score**: 4 digits. Accumulates per line cleared.
+- **Lines**: running count of total lines you've cleared. Every 10 lines = level up.
+- **Level**: a single digit. Higher level = faster natural drop = less thinking time.
+
+### THE GHOST
+
+When you rotate or move your piece, an **outlined ghost** appears at the position where the piece would land if you dropped right now. This is your landing forecast. Use it. The ghost shows only for human players — the CPUs fly blind and they still beat you, so don't get cocky.
 
 ---
 

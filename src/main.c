@@ -8,16 +8,21 @@
 #include "music.h"
 
 void Render_Init(void);
+void Render_GameBegin(void);
 void Render_Frame(void);
 void Render_Victory(u8 winnerIdx);
 void Render_TitleScreen(void);
 void Render_TitleReady(u8 pIdx);
+void Render_TitleCPU(u8 pIdx);
 void Input_Init(void);
 void Input_GameUpdate(void);
 u8   Input_TitleCheck(void);
 
 // BIOS JIFFY counter — incremented every VBlank by BIOS ISR
 #define JIFFY (*(volatile u16*)0xFC9E)
+
+// Auto-start timer after first human joins (~8 seconds at 50Hz)
+#define TITLE_COUNTDOWN  400
 
 void main(void) {
     u8 i, j;
@@ -37,30 +42,51 @@ void main(void) {
         Music_Init();  // Start title music
         {
             u8 ready = 0;
+            u16 timer = 0;  // 0 = not started; counts down after first join
             Render_TitleScreen();
-            while (ready != 0x0F) {
+            while (1) {
                 Halt();
                 Music_Update();
                 {
                     u8 pressed = Input_TitleCheck();
                     u8 p;
+                    u8 newJoins = 0;
                     for (p = 0; p < NUM_PLAYERS; p++) {
                         if ((pressed & (1 << p)) && !(ready & (1 << p))) {
                             ready |= (1 << p);
                             Render_TitleReady(p);
+                            newJoins = 1;
                         }
                     }
+                    // Reset timer on any new join
+                    if (newJoins) timer = TITLE_COUNTDOWN;
+                    // All humans joined → start immediately
+                    if (ready == 0x0F) break;
+                }
+                // Count down if timer active; start when it hits 0
+                if (timer > 0) {
+                    timer--;
+                    if (timer == 0 && ready != 0) break;
                 }
                 if (Keyboard_IsKeyPressed(KEY_ESC)) { Bios_Exit(0); }
             }
+
+            // Commit slot configuration
+            g_HumanMask = ready;
+
+            // Show CPU labels for unclaimed slots
+            for (i = 0; i < NUM_PLAYERS; i++) {
+                if (!(ready & (1 << i))) Render_TitleCPU(i);
+            }
+
             // Brief pause before starting
-            for (i = 0; i < 30; i++) { Halt(); Music_Update(); }
+            for (i = 0; i < 60; i++) { Halt(); Music_Update(); }
         }
 
         // --- GAME ---
         Game_Init();
         Music_StartGame();
-        Render_Init();
+        Render_GameBegin();
         Render_Frame();
         lastJiffy = JIFFY;
 
@@ -75,8 +101,18 @@ void main(void) {
             Input_GameUpdate();
 
             for (j = 0; j < elapsed; j++) {
-                for (i = 0; i < NUM_PLAYERS; i++)
+                // Round-robin: only one AI gets a turn to think each tick.
+                // Others just execute their already-computed plan (cheap).
+                u8 aiTurn = g_Frame & 3;
+                for (i = 0; i < NUM_PLAYERS; i++) {
+                    if (!(g_HumanMask & (1 << i))) {
+                        // Only the "turn" AI may do the heavy search this tick;
+                        // others run their execution step only if already planned.
+                        if (i == aiTurn || g_Players[i].aiComputed)
+                            Player_AI(&g_Players[i], g_Frame);
+                    }
                     Player_Update(&g_Players[i]);
+                }
                 Music_Update();
                 g_Frame++;
             }
@@ -89,14 +125,13 @@ void main(void) {
                 u8 vicTimer = 0;
                 Music_Victory();
                 Render_Victory(winner);
-                // Play victory music, then return to title
-                while (vicTimer < 200) {  // ~4 seconds at 50Hz
+                while (vicTimer < 200) {
                     Halt();
                     Music_Update();
                     vicTimer++;
                     if (Keyboard_IsKeyPressed(KEY_ESC)) break;
                 }
-                break;  // Back to title
+                break;
             }
 
             if (Keyboard_IsKeyPressed(KEY_ESC)) { Bios_Exit(0); }

@@ -61,7 +61,16 @@ typedef struct {
     // AI
     i8  aiTargetX;
     u8  aiTargetRot;
-    u8  aiComputed;     // bool
+    u8  aiComputed;     // bool — set when search is finished
+    u8  aiGoal;         // lines the AI is trying to clear this piece (1/2/3/4)
+    u8  aiDropDelay;    // ticks between AI-forced drops after alignment (per piece)
+    u8  aiDropCounter;  // counts up while aligned; triggers drop when == aiDropDelay
+    u8  aiEvalRot;      // current rotation being searched
+    u8  aiEvalCol;      // current column index being searched (0..BOARD_W)
+    u8  aiBaseReady;    // bool — base heights/rowCount have been computed
+    i16 aiBestScore;    // best score found so far during the spread search
+    u8  aiBaseHeights[BOARD_W];  // precomputed column heights
+    u8  aiBaseRowCount[BOARD_H]; // precomputed filled-cells per row
 
     // Targeting
     u8  targetPlayer;   // index of player we're attacking (0-3)
@@ -87,4 +96,5 @@ void Player_AddGarbage(Player* p, u8 count);
 
 extern Player g_Players[NUM_PLAYERS];
 extern u8     g_Frame;
+extern u8     g_HumanMask;  // bit i = 1 → player i is human, else AI
 extern const PieceDef g_Pieces[NUM_PIECES];

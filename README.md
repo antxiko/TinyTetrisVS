@@ -63,22 +63,35 @@ Garbage rows slam into the **bottom** of your target's board, pushing everything
 
 There is no time limit. There is no final score that matters. There is only survival. When three players are dead, the last one alive is the **champion**. Period.
 
+## THE CPU OPPONENTS
+
+Don't have four humans? **No problem.** The game ships with a battle-ready AI that fills any empty slot. At the title screen, players press their buttons to join as human; after a short timer, whoever didn't press becomes a **CPU opponent**.
+
+The AI is not a demonstration. The AI is a **threat**:
+
+- **Goal-aware play**: each piece, the AI decides whether to aim for 2, 3, or occasionally 4 lines — and refuses to prematurely clear singles when it can bank combos
+- **Board evaluation**: heights, holes, bumpiness, maximum stack — the AI judges every possible placement before choosing its move
+- **Strategic targeting**: when the player it's attacking dies, the AI auto-retargets to a new victim
+- **Organic pacing**: varied drop cadence per piece, no metronome-perfect speed demons
+
+You can face up to **3 CPUs at once**. They can team up on you without meaning to. May the gods have mercy on your T-pieces.
+
 ## REQUIREMENTS
 
 | Component | Specification |
 |---|---|
 | **Computer** | MSX1 (or higher) |
 | **RAM** | 16 KB |
-| **ROM** | 16 KB cartridge |
+| **ROM** | 32 KB cartridge |
 | **Video** | TMS9918A (Screen 2 / GRAPHIC2) |
 | **Sound** | AY-3-8910 PSG |
-| **Multiplayer** | **Ninja Tap** adapter (required for 2-4 players) |
+| **Multiplayer** | **Ninja Tap** adapter (optional — 2-4 humans) |
 
 ### ABOUT THE NINJA TAP
 
 The **Ninja Tap** is a joystick multiplexer that connects to the MSX joystick port and allows up to **4 controllers on a single port**. It was originally designed by the Gigamix team for the MSX scene and remains the standard for multiplayer MSX gaming.
 
-**You NEED a Ninja Tap to play with more than one human player.** Without it, Player 1 uses the keyboard and Players 2-4 are controlled by AI.
+**You NEED a Ninja Tap to play with more than one human player.** Without it, Player 1 uses the keyboard and Players 2-4 are controlled by the AI.
 
 Compatible Ninja Tap adapters:
 - Original Ninja Tap (Gigamix)
@@ -106,22 +119,32 @@ Compatible Ninja Tap adapters:
 | **Down** | Soft drop (hold for fast fall) |
 | **Button A** | Cycle target |
 
+## WHAT'S ON SCREEN
+
+Each player's 32-pixel-wide strip is its own HUD + battlefield:
+
+- **Header**: player label, **next-piece preview**, live score, line counter, current **level**
+- **Targeting sprite**: a colored arrow above the player you're attacking, bobbing gently for life
+- **Ghost piece**: an outline showing where your current piece will land — only for humans, because the CPUs don't need hand-holding
+- **Board**: 8×20 playfield in the player's personal color
+- **GAME OVER strip**: when you die, your whole lane turns dark red with white "GAME OVER" letters
+
 ## TECHNICAL INSANITY
 
-This entire game fits in **16 KB of ROM**. That's 16,384 bytes. That's less than a single favicon on most websites. Here's what's packed in there:
+This entire game fits in a **32 KB cartridge**. On a 1983 computer. Here's what's packed in there:
 
-- **4 simultaneous Tetris boards** with full game logic
+- **4 simultaneous Tetris boards** with full game logic, running in parallel
 - **7 tetromino pieces** with rotation states, packed as bitmasks in 16-bit words
-- **AI opponents** with heuristic board evaluation (column heights, holes, bumpiness, line completion)
-- **Dirty rendering engine** — only VRAM cells that actually changed get written. Typical frame: 0-8 writes when a piece moves, zero when nothing changes
-- **Line clear flash animation** with board collapse
-- **Korobeiniki** (the Tetris theme) playing on PSG channels A and B
-- **Sprite-based targeting system** with 4 hardware sprites
-- **Garbage warfare** mechanic with board-push animation
-- **Soft drop** with auto-repeat on horizontal movement
-- **NinjaTap driver** supporting both MSXgl and Gigamix protocols
+- **Double-buffered renderer** — a 768-byte RAM shadow of the name table, flushed to VRAM once per frame with per-row dirty tracking. Zero flicker, minimum VDP traffic.
+- **Fixed-tile palette** — 27 pre-baked tiles (block, empty, garbage, flash, separator, ghost, dead-letters) replicated across all 3 Screen 2 pattern banks. Board cells cost **1 byte per cell**, not 16.
+- **Ghost piece rendering** using a closed-form landing-y formula with cached column heights — no expensive collision loops
+- **AI opponents** with goal-aware heuristic evaluation (column heights, holes, bumpiness, line completion) — search spread across frames with round-robin scheduling so the frame rate never stalls
+- **NinjaTap driver** supporting both MSXgl and Gigamix protocols simultaneously
+- **Three PSG tracks**: title-screen theme, in-game Korobeiniki, victory fanfare
+- **Sprite-based targeting system** with 4 hardware sprites, one per attacker
+- **Garbage warfare** with flash-row-shift correction and in-flight piece lock-on-garbage (pieces at landing position get locked and carried up with the shift)
 
-The Z80 runs at 3.58 MHz. The VDP has 16 KB of VRAM. The entire playfield is 32×24 tiles in Screen 2 mode with identity-mapped name tables for per-cell pattern and color control. Every byte counts. Every cycle matters. And somehow, it all fits.
+The Z80 runs at 3.58 MHz. The VDP has 16 KB of VRAM. The entire playfield is 32×24 tiles in Screen 2 mode. Every byte counts. Every cycle matters. And somehow, it all fits.
 
 ## BUILD FROM SOURCE
 

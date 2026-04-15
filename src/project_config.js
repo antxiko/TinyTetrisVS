@@ -31,8 +31,8 @@ LibModules = [ "system", "bios", "vdp", "input", "memory", "math", "psg", "devic
 // MSX1
 Machine = "1";
 
-// 16K ROM (page 1: 4000h~7FFFh) — fits in 16KB!
-Target = "ROM_16K";
+// 32K ROM (pages 1-2: 4000h~BFFFh)
+Target = "ROM_32K";
 
 //*****************************************************************************
 // SIGNATURE SETTINGS

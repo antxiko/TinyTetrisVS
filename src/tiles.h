@@ -209,3 +209,43 @@ static const u8 g_Font[][8] = {
 #undef _F
 
 #define FONT_COUNT (sizeof(g_Font) / 8)
+
+// ============================================================================
+// FIXED TILE INDICES (used during gameplay via NameBuffer)
+// Pre-generated in VRAM at game start, replicated across all 3 banks.
+// Board cells (rows 4-23) only write name table bytes (1 byte per cell).
+// ============================================================================
+#define TILE_EMPTY_BLACK   0
+#define TILE_EMPTY_P0      1   // player bg color, empty pattern
+#define TILE_EMPTY_P1      2
+#define TILE_EMPTY_P2      3
+#define TILE_EMPTY_P3      4
+#define TILE_BLOCK_P0      5   // player block
+#define TILE_BLOCK_P1      6
+#define TILE_BLOCK_P2      7
+#define TILE_BLOCK_P3      8
+#define TILE_GARBAGE       9
+#define TILE_FLASH        10
+#define TILE_SEP_P0       11   // solid separator (block color fill)
+#define TILE_SEP_P1       12
+#define TILE_SEP_P2       13
+#define TILE_SEP_P3       14
+#define TILE_DEAD         15   // dark red empty
+#define TILE_DEAD_G       16   // GAME OVER letters, white on dark red
+#define TILE_DEAD_A       17
+#define TILE_DEAD_M       18
+#define TILE_DEAD_E       19
+#define TILE_DEAD_O       20
+#define TILE_DEAD_V       21
+#define TILE_DEAD_R       22
+#define TILE_GHOST_P0     23   // ghost/landing preview outline, player color on bg
+#define TILE_GHOST_P1     24
+#define TILE_GHOST_P2     25
+#define TILE_GHOST_P3     26
+#define FIXED_TILE_COUNT  27
+
+// Helper: value 0-5 on board (0=empty, 1-4=player, 5=garbage) → tile index
+#define BOARD_TILE(val, pIdx) \
+    ((val) == 0 ? (TILE_EMPTY_P0 + (pIdx)) : \
+     (val) == 5 ? TILE_GARBAGE : \
+                  (TILE_BLOCK_P0 + ((val) - 1)))

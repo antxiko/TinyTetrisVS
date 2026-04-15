@@ -9,6 +9,7 @@
 // ============================================================================
 Player g_Players[NUM_PLAYERS];
 u8     g_Frame = 0;
+u8     g_HumanMask = 0x01;  // bit i = 1 → player i is human. Default: only P1.
 
 // ============================================================================
 // PIECES — packed bitmask
@@ -76,12 +77,35 @@ u8 Player_Valid(const Player* p, u8 pieceIdx, u8 rot, i8 x, i8 y) {
 // ============================================================================
 
 void Player_Spawn(Player* p) {
+    u8 r;
     p->pieceIdx = p->nextIdx;
     p->nextIdx = Math_GetRandom8() % NUM_PIECES;
     p->rot = 0;
     p->px = (BOARD_W / 2) - 1;
     p->py = 0;
+
+    // Reset AI spread-search state
     p->aiComputed = 0;
+    p->aiBaseReady = 0;
+    p->aiEvalRot = 0;
+    p->aiEvalCol = 0;
+    p->aiBestScore = -32000;
+    p->aiTargetX = p->px;
+    p->aiTargetRot = 0;
+
+    // Pick AI goal for this piece: mostly 2 lines, sometimes 3, rarely 4
+    // Distribution: ~70% goal=2, ~22% goal=3, ~8% goal=4
+    r = Math_GetRandom8();
+    if (r < 20)       p->aiGoal = 4;
+    else if (r < 76)  p->aiGoal = 3;
+    else              p->aiGoal = 2;
+
+    // AI drop cadence: after aligning, force a drop every ~8-14 ticks.
+    // Between natural fall (50 ticks) and human soft-drop (3 ticks) — feels
+    // deliberate but keeps the match flowing. Slight per-piece variation.
+    p->aiDropDelay = (u8)(8 + (Math_GetRandom8() & 7));  // 8..15
+    p->aiDropCounter = 0;
+
     if (!Player_Valid(p, p->pieceIdx, p->rot, p->px, p->py))
         p->dead = 1;
 }
@@ -102,6 +126,7 @@ static void Player_Init(Player* p, u8 idx) {
     p->flashTimer = 0;
     p->flashCount = 0;
     p->aiComputed = 0;
+    p->aiGoal = 2;
     p->targetPlayer = (idx + 1) % NUM_PLAYERS;
     p->boardDirty = 0;
 
@@ -221,6 +246,21 @@ static void Player_ClearLines(Player* p) {
 
 void Player_Update(Player* p) {
     if (p->dead) return;
+
+    // If current target is dead, reassign to a random alive non-self player
+    if (g_Players[p->targetPlayer].dead) {
+        u8 pIdx = (u8)(p - g_Players);
+        u8 start = Math_GetRandom8() & 3;
+        u8 j;
+        for (j = 0; j < NUM_PLAYERS; j++) {
+            u8 cand = (u8)((start + j) & 3);
+            if (cand != pIdx && !g_Players[cand].dead) {
+                p->targetPlayer = cand;
+                break;
+            }
+        }
+    }
+
     if (p->flashTimer > 0) {
         p->flashTimer--;
         if (p->flashTimer == 0)
@@ -241,99 +281,209 @@ void Player_Update(Player* p) {
 // AI
 // ============================================================================
 
-static i16 EvalPos(const Player* p, u8 pieceIdx, u8 rot, i8 x, i8 y) {
-    u8 tmpBoard[BOARD_H][BOARD_W];
+// Compute where the piece would land at (rot, x) using precomputed heights.
+// Returns y >= 0 if valid, -1 if piece spills off the board.
+// Constant-time per piece column — replaces a 20-iteration Player_Valid loop.
+static i8 FindLandingY(const Player* p, u8 pieceIdx, u8 rot, i8 x) {
     const PieceRot* s = Piece_GetRot(pieceIdx, rot);
+    i8 bestY = 100;
+    u8 c, r;
+
+    for (c = 0; c < s->w; c++) {
+        u8 botPr = 0xFF;
+        i8 bc = x + (i8)c;
+        for (r = 0; r < s->h; r++)
+            if (Piece_GetBit(s->bits, r, c)) botPr = r;
+        if (botPr == 0xFF) continue;          // no piece cells in this column
+        if (bc < 0 || bc >= BOARD_W) return -1;  // piece extends off-board
+        {
+            i8 yCol = (i8)(BOARD_H - 1 - p->aiBaseHeights[bc]) - (i8)botPr;
+            if (yCol < bestY) bestY = yCol;
+        }
+    }
+    if (bestY < 0 || bestY >= BOARD_H) return -1;
+    return bestY;
+}
+
+// Precompute column heights and per-row filled counts from the current board.
+// Called once per piece (at start of AI search). Without this, every EvalPos
+// would need to rescan 160 board cells.
+static void ComputeBaseState(Player* p) {
     u8 r, c;
-    i16 maxH = 0, holes = 0, bump = 0, lines = 0;
-    i16 heights[BOARD_W];
-
-    for (r = 0; r < BOARD_H; r++)
-        for (c = 0; c < BOARD_W; c++)
-            tmpBoard[r][c] = p->board[r][c];
-
-    for (r = 0; r < s->h; r++)
-        for (c = 0; c < s->w; c++)
-            if (Piece_GetBit(s->bits, r, c)) {
-                i8 br = y + (i8)r;
-                i8 bc = x + (i8)c;
-                if (br >= 0 && br < BOARD_H && bc >= 0 && bc < BOARD_W)
-                    tmpBoard[br][bc] = 1;
-            }
-
     for (c = 0; c < BOARD_W; c++) {
         u8 found = 0;
-        heights[c] = 0;
+        p->aiBaseHeights[c] = 0;
         for (r = 0; r < BOARD_H; r++) {
-            if (tmpBoard[r][c]) {
-                if (!found) { heights[c] = BOARD_H - r; found = 1; }
-                if ((i16)(BOARD_H - r) > maxH) maxH = BOARD_H - r;
-            } else if (found) {
-                holes++;
+            if (p->board[r][c] && !found) {
+                p->aiBaseHeights[c] = (u8)(BOARD_H - r);
+                found = 1;
+            }
+        }
+    }
+    for (r = 0; r < BOARD_H; r++) {
+        u8 cnt = 0;
+        for (c = 0; c < BOARD_W; c++)
+            if (p->board[r][c]) cnt++;
+        p->aiBaseRowCount[r] = cnt;
+    }
+    p->aiBaseReady = 1;
+}
+
+// Evaluate placing piece at (rot, x, y) using precomputed base state.
+// No full board scan — only iterates the 4x4 piece footprint.
+// Extra holes are approximated as the air gap between piece bottom and the
+// existing stack top in each column (ignores intra-piece gaps; accurate enough).
+static i16 EvalPos(const Player* p, u8 pieceIdx, u8 rot, i8 x, i8 y) {
+    const PieceRot* s = Piece_GetRot(pieceIdx, rot);
+    u8 r, c;
+    u8 heights[BOARD_W];
+    u8 rowAdd[BOARD_H];
+    i16 maxH = 0, bump = 0;
+    i16 lines = 0;
+    i16 extraHoles = 0;
+
+    // Copy base heights (8 bytes) and clear rowAdd (20 bytes)
+    for (c = 0; c < BOARD_W; c++) heights[c] = p->aiBaseHeights[c];
+    for (r = 0; r < BOARD_H; r++) rowAdd[r] = 0;
+
+    // Per-column pass: find topmost + bottommost piece row in each piece column,
+    // update heights, estimate new holes from the air gap.
+    for (c = 0; c < s->w; c++) {
+        u8 topPr = 0xFF, botPr = 0xFF;
+        i8 bc = x + (i8)c;
+        if (bc < 0 || bc >= BOARD_W) continue;
+        for (r = 0; r < s->h; r++) {
+            if (Piece_GetBit(s->bits, r, c)) {
+                if (topPr == 0xFF) topPr = r;
+                botPr = r;
+            }
+        }
+        if (topPr == 0xFF) continue;
+        {
+            i8 topRow = y + (i8)topPr;
+            i8 botRow = y + (i8)botPr;
+            u8 oldH = p->aiBaseHeights[bc];
+            u8 oldTopRow = oldH ? (u8)(BOARD_H - oldH) : (u8)BOARD_H;
+            u8 newH;
+            if (topRow < 0) continue;
+            // Air gap below piece bottom creates new holes
+            if ((i8)(botRow + 1) < (i8)oldTopRow)
+                extraHoles += (i16)((u8)oldTopRow - (u8)(botRow + 1));
+            newH = (u8)(BOARD_H - topRow);
+            if (newH > heights[bc]) heights[bc] = newH;
+        }
+    }
+
+    // Count piece cells per board row (for line detection)
+    for (r = 0; r < s->h; r++) {
+        for (c = 0; c < s->w; c++) {
+            if (Piece_GetBit(s->bits, r, c)) {
+                i8 br = y + (i8)r;
+                if (br >= 0 && br < BOARD_H) rowAdd[br]++;
             }
         }
     }
 
+    // Line count: rows where base + piece additions fill the row
     for (r = 0; r < BOARD_H; r++) {
-        u8 full = 1;
-        for (c = 0; c < BOARD_W; c++)
-            if (tmpBoard[r][c] == 0) { full = 0; break; }
-        if (full) lines++;
+        if (rowAdd[r] == 0) continue;
+        if ((u8)(p->aiBaseRowCount[r] + rowAdd[r]) >= BOARD_W) lines++;
     }
 
+    // maxH
+    for (c = 0; c < BOARD_W; c++)
+        if ((i16)heights[c] > maxH) maxH = heights[c];
+
+    // Bumpiness
     for (c = 0; c < BOARD_W - 1; c++) {
-        i16 d = heights[c] - heights[c + 1];
+        i16 d = (i16)heights[c] - (i16)heights[c + 1];
         if (d < 0) d = -d;
         bump += d;
     }
 
-    return lines * 200 - holes * 150 - bump * 20 - maxH * 10;
+    // Line score — goal-aware
+    {
+        i16 lineScore;
+        if (maxH >= 15)                     lineScore = lines * 300;
+        else if (lines == 0)                lineScore = 80;
+        else if ((u8)lines < p->aiGoal)     lineScore = 20;
+        else                                lineScore = 500 + lines * 200;
+        return lineScore - extraHoles * 150 - bump * 20 - maxH * 10;
+    }
 }
+
+// AI: search is spread across multiple frames to avoid per-piece stalls.
+// Each call evaluates up to AI_BUDGET candidate positions, then executes one
+// step of the currently-best plan (rotate/move/soft-drop).
+#define AI_BUDGET 2
 
 void Player_AI(Player* p, u8 frame) {
     (void)frame;
     if (p->dead || p->flashTimer > 0) return;
 
+    // --- SEARCH PHASE (spread across frames) ---
     if (!p->aiComputed) {
-        i16 bestScore = -32000;
-        i8 bestX = p->px;
-        u8 bestRot = p->rot;
         u8 numRots = g_Pieces[p->pieceIdx].numRots;
-        u8 ri;
-        i8 xi, yi;
+        u8 budget = AI_BUDGET;
 
-        for (ri = 0; ri < numRots; ri++) {
-            for (xi = -1; xi < (i8)BOARD_W; xi++) {
-                if (!Player_Valid(p, p->pieceIdx, ri, xi, p->py))
-                    continue;
-                yi = p->py;
-                while (Player_Valid(p, p->pieceIdx, ri, xi, yi + 1)) yi++;
-                {
-                    i16 sc = EvalPos(p, p->pieceIdx, ri, xi, yi);
-                    if (sc > bestScore) {
-                        bestScore = sc;
-                        bestX = xi;
-                        bestRot = ri;
-                    }
+        // One-shot: precompute base heights + row counts for this piece
+        if (!p->aiBaseReady) {
+            ComputeBaseState(p);
+            budget--;  // base scan costs roughly one eval
+        }
+
+        while (budget-- > 0 && !p->aiComputed) {
+            i8 xi = (i8)p->aiEvalCol - 1;   // columns: -1 .. BOARD_W-1
+            u8 ri = p->aiEvalRot;
+            i8 yi = FindLandingY(p, p->pieceIdx, ri, xi);
+
+            if (yi >= 0) {
+                i16 sc = EvalPos(p, p->pieceIdx, ri, xi, yi);
+                if (sc > p->aiBestScore) {
+                    p->aiBestScore = sc;
+                    p->aiTargetX = xi;
+                    p->aiTargetRot = ri;
                 }
             }
+
+            // Advance to next (rot, col)
+            p->aiEvalCol++;
+            if (p->aiEvalCol > BOARD_W) {
+                p->aiEvalCol = 0;
+                p->aiEvalRot++;
+                if (p->aiEvalRot >= numRots)
+                    p->aiComputed = 1;
+            }
         }
-        p->aiTargetX = bestX;
-        p->aiTargetRot = bestRot;
-        p->aiComputed = 1;
+        // Still searching — don't execute moves yet
+        if (!p->aiComputed) return;
     }
 
-    if (p->rot != p->aiTargetRot)
+    // --- EXECUTION PHASE: one step per call ---
+    // AI never uses human soft-drop (too fast). Instead, once aligned, we
+    // gently force one extra drop every aiDropDelay ticks — a steady cadence
+    // that sits between natural fall and soft-drop.
+    p->softDrop = 0;
+
+    if (p->rot != p->aiTargetRot) {
         p->rot = p->aiTargetRot % g_Pieces[p->pieceIdx].numRots;
-    else if (p->px < p->aiTargetX)
+        p->aiDropCounter = 0;
+    }
+    else if (p->px < p->aiTargetX) {
         Player_Move(p, 1);
-    else if (p->px > p->aiTargetX)
+        p->aiDropCounter = 0;
+    }
+    else if (p->px > p->aiTargetX) {
         Player_Move(p, -1);
+        p->aiDropCounter = 0;
+    }
     else {
-        // Hard drop: slam piece all the way down instantly
-        while (Player_Valid(p, p->pieceIdx, p->rot, p->px, p->py + 1))
-            p->py++;
-        Player_Drop(p); // This will call Player_Lock
+        // Aligned — accumulate ticks and drop one row when threshold reached
+        p->aiDropCounter++;
+        if (p->aiDropCounter >= p->aiDropDelay) {
+            p->aiDropCounter = 0;
+            Player_Drop(p);
+        }
     }
 }
 
@@ -357,6 +507,33 @@ void Player_AddGarbage(Player* p, u8 count) {
     u8 i, c;
     u8 gap;
     if (p->dead) return;
+
+    // If the target's piece is at landing position (can't drop further), lock
+    // it first so it becomes part of the board and rides the shift up with
+    // the rest. Otherwise it would appear stuck inside the new garbage.
+    // Skip if already mid-flash (piece already locked, waiting to clear).
+    if (p->flashTimer == 0 &&
+        !Player_Valid(p, p->pieceIdx, p->rot, p->px, p->py + 1)) {
+        Player_Lock(p);
+        if (p->dead) return;
+    }
+
+    p->boardDirty = 1;  // mark dirty BEFORE any death check so partial shifts render
+
+    // If target is mid-flash, shift their flashRows to match the upward shift.
+    // Rows pushed off the top are dropped; if all drop, cancel the flash.
+    if (p->flashTimer > 0) {
+        u8 k;
+        u8 newCount = 0;
+        for (k = 0; k < p->flashCount; k++) {
+            i8 nr = (i8)p->flashRows[k] - (i8)count;
+            if (nr >= 0)
+                p->flashRows[newCount++] = (u8)nr;
+        }
+        p->flashCount = newCount;
+        if (newCount == 0) p->flashTimer = 0;
+    }
+
     for (i = 0; i < count; i++) {
         u8 r;
         // Check if top row has blocks — if so, player dies
@@ -372,7 +549,6 @@ void Player_AddGarbage(Player* p, u8 count) {
         for (c = 0; c < BOARD_W; c++)
             p->board[BOARD_H - 1][c] = (c == gap) ? 0 : 5;  // 5 = garbage color
     }
-    p->boardDirty = 1;
 }
 
 // ============================================================================

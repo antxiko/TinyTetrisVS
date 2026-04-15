@@ -182,23 +182,18 @@ u8 Input_TitleCheck(void) {
 
 void Input_GameUpdate(void) {
     if (s_ntapPorts >= 2) {
-        // NinjaTap detected — update all joystick states
         NTap_Update();
 
-        // P1: keyboard only (space/arrows leak into joystick in emulator)
-        DoKeyboardP1();
+        if (g_HumanMask & 0x01) DoKeyboardP1();
 
-        // P2-P4: joysticks 1-3
         if (s_ntapPorts >= 5) {
-            DoJoyPlayer(1, 1);
-            DoJoyPlayer(2, 2);
-            DoJoyPlayer(3, 3);
+            if (g_HumanMask & 0x02) DoJoyPlayer(1, 1);
+            if (g_HumanMask & 0x04) DoJoyPlayer(2, 2);
+            if (g_HumanMask & 0x08) DoJoyPlayer(3, 3);
         } else {
-            // Only 2 standard ports: P2 = joystick 1
-            DoJoyPlayer(1, 1);
+            if (g_HumanMask & 0x02) DoJoyPlayer(1, 1);
         }
     } else {
-        // No NinjaTap — keyboard only for P1
-        DoKeyboardP1();
+        if (g_HumanMask & 0x01) DoKeyboardP1();
     }
 }

@@ -1,2 +1,2 @@
 # Versioned ROMs (keep only tinitetris4p.rom as latest)
-tinitetris[0-9][0-9].rom
+builds/tinitetris[0-9][0-9].rom
