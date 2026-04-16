@@ -914,3 +914,102 @@ void Render_Victory(u8 winnerIdx) {
     PutTileIdentity(sx+2, 11, g_Font['N'-32], colBlock);
     PutTileIdentity(sx+3, 11, g_Font['S'-32], colBlock);
 }
+
+// ============================================================================
+// POST-GAME STATS SCREEN (identity mode)
+// ============================================================================
+
+// Helper: write a stat label + number into a player's column
+static void PutStatLabel(u8 sx, u8 y, u8 c1, u8 c2, u8 c3, const u8* col) {
+    PutTileIdentity(sx + 1, y, g_Font[c1 - 32], col);
+    PutTileIdentity(sx + 2, y, g_Font[c2 - 32], col);
+    PutTileIdentity(sx + 3, y, g_Font[c3 - 32], col);
+}
+
+static void PutStatNum(u8 sx, u8 y, u16 val, const u8* col) {
+    u8 buf[3];
+    u8 n = 0;
+    u8 k;
+    if (val == 0) { buf[n++] = 0; }
+    else { while (val > 0 && n < 3) { buf[n++] = (u8)(val % 10); val /= 10; } }
+    for (k = 0; k < 3; k++) {
+        u8 pos = 2 - k;
+        u8 d = (k < n) ? buf[k] : 0;
+        PutTileIdentity(sx + 5 + pos, y, g_Font['0' + d - 32], col);
+    }
+}
+
+void Render_Stats(void) {
+    u8 r, c, i;
+    u8 colBg[8], colTitle[8];
+
+    Render_IdentityMode();
+
+    // Black background
+    for (i = 0; i < 8; i++) {
+        colBg[i] = (u8)((COLOR_BLACK << 4) | COLOR_BLACK);
+        colTitle[i] = (u8)((COLOR_WHITE << 4) | COLOR_BLACK);
+    }
+    for (r = 0; r < 24; r++)
+        for (c = 0; c < 32; c++)
+            PutTileIdentity(c, r, g_PatEmpty, colBg);
+
+    // Title: "STATS" centered
+    PutTileIdentity(13, 1, g_Font['S'-32], colTitle);
+    PutTileIdentity(14, 1, g_Font['T'-32], colTitle);
+    PutTileIdentity(15, 1, g_Font['A'-32], colTitle);
+    PutTileIdentity(16, 1, g_Font['T'-32], colTitle);
+    PutTileIdentity(17, 1, g_Font['S'-32], colTitle);
+
+    // Per-player stats in their colored strip
+    for (i = 0; i < NUM_PLAYERS; i++) {
+        const Player* p = &g_Players[i];
+        const PlayerColors* pc = &g_PlayerColors[i];
+        u8 sx = i * 8;
+        u8 colH[8], colL[8];
+        u8 j;
+
+        for (j = 0; j < 8; j++) {
+            colH[j] = (u8)((pc->block << 4) | COLOR_BLACK);
+            colL[j] = (u8)((pc->text  << 4) | COLOR_BLACK);
+        }
+
+        // "Px" header
+        PutTileIdentity(sx + 3, 4, g_Font['P'-32], colH);
+        PutTileIdentity(sx + 4, 4, g_Font['1'+i-32], colH);
+
+        // Dead marker or WINNER
+        if (!p->dead) {
+            u8 colW[8];
+            for (j = 0; j < 8; j++)
+                colW[j] = (u8)((COLOR_WHITE << 4) | COLOR_BLACK);
+            PutTileIdentity(sx + 2, 5, g_Font['W'-32], colW);
+            PutTileIdentity(sx + 3, 5, g_Font['I'-32], colW);
+            PutTileIdentity(sx + 4, 5, g_Font['N'-32], colW);
+        }
+
+        // Score row 7
+        PutStatLabel(sx, 7, 'S', 'C', 'O', colL);
+        PutStatNum(sx, 7, p->score, colH);
+
+        // Lines row 9
+        PutStatLabel(sx, 9, 'L', 'I', 'N', colL);
+        PutStatNum(sx, 9, p->lines, colH);
+
+        // Garbage sent row 11
+        PutStatLabel(sx, 11, 'G', 'R', 'B', colL);
+        PutStatNum(sx, 11, p->garbageSent, colH);
+
+        // T-spins row 13
+        PutStatLabel(sx, 13, 'T', 'S', 'P', colL);
+        PutStatNum(sx, 13, p->tSpinCount, colH);
+
+        // Max combo row 15
+        PutStatLabel(sx, 15, 'C', 'M', 'B', colL);
+        PutStatNum(sx, 15, p->maxCombo, colH);
+
+        // Level row 17
+        PutStatLabel(sx, 17, 'L', 'V', 'L', colL);
+        PutStatNum(sx, 17, p->level, colH);
+    }
+}

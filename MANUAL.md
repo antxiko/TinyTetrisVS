@@ -221,8 +221,18 @@ Single lines are for survival. If you want to **attack**, you need combos:
 
 A **4-line clear** (the legendary Tetris) sends FOUR rows of garbage. That's 20% of the entire board. In one move. It's devastating. It's beautiful. It's why you play this game.
 
+### Step 3.5: THE T-SPIN
+
+If you rotate a **T-piece** into a tight slot where 3 of its 4 diagonal corners are occupied — walls, blocks, floor — that's a **T-spin**. The game knows. The game rewards you.
+
+T-spin garbage is **doubled**: a T-spin single sends 2 rows. A T-spin double sends 4. A T-spin triple sends 6. This is the deadliest move in the game. Learn it. Master it. Fear the players who already have.
+
+### Step 3.75: COMBOS
+
+Clear lines on **consecutive locks** and the combo counter climbs. Each combo level beyond the first adds **+1 garbage row** on top of the base damage. Chain three clears in a row and you're sending devastating waves. Miss one lock without a clear and the combo resets to zero.
+
 ### Step 4: Watch Them Suffer
-Garbage rows appear at the **bottom** of your target's board. Everything they've built gets shoved upward. Each garbage row is solid gray blocks with one random gap — just enough hope to keep them playing, not enough to save them.
+Garbage rows rise from the **bottom** of your target's board — **one row at a time**, climbing like a slow, inevitable tide. Everything they've built gets shoved upward. Their falling piece rides the wave up. Each garbage row is solid gray blocks with one random gap — just enough hope to keep them playing, not enough to save them.
 
 ### Step 5: Be the Last One Standing
 When a player's blocks reach the top, their board turns **dark red** and displays:
@@ -250,7 +260,27 @@ The moment the third player falls, the game stops. The screen floods with the wi
 
 A **victory fanfare** erupts from the PSG. Trumpets of triumph. Horns of glory. Well, square waves of glory — but on a Z80, that's the same thing.
 
-After the celebration, the game returns to the title screen. Plug in. Ready up. **Go again.**
+After the celebration, the **STATS** screen appears:
+
+```
+           STATS
+
+  P1     P2     P3     P4
+  SCO    SCO    SCO    SCO
+  LIN    LIN    LIN    LIN
+  GRB    GRB    GRB    GRB
+  TSP    TSP    TSP    TSP
+  CMB    CMB    CMB    CMB
+  LVL    LVL    LVL    LVL
+```
+
+Every player's final score, lines cleared, garbage sent, T-spins landed, longest combo, and level reached — all displayed in their player color. The winner gets a shining **WIN** label. Study these numbers. Learn from them. Use them to trash-talk your friends.
+
+Press any key or wait 15 seconds. The game returns to the title screen. **Go again.**
+
+### ATTRACT MODE
+
+Nobody home? No problem. Leave the title screen alone for 15 seconds and the machine takes over — **4 CPUs play a demo match**. Watch, learn, be humbled. Press any key to return to the title and join the fight yourself.
 
 ---
 
@@ -292,12 +322,12 @@ The **Korobeiniki** — a Russian folk song from 1861 — plays endlessly throug
 ```
 ╔═══════════════════════════════════════════════╗
 ║                                               ║
-║  Tiny Tetris VS fits in 16 KB.                ║
+║  Tiny Tetris VS fits in 32 KB.                ║
 ║                                               ║
-║  That's 16,384 bytes.                         ║
-║  Less than this manual.                       ║
-║  Less than a modern email signature.          ║
-║  Less than a single app loading spinner.      ║
+║  That's 32,768 bytes.                         ║
+║  Less than a single web font.                 ║
+║  Less than a modern app's splash screen.      ║
+║  Less than the JavaScript to render a button. ║
 ║                                               ║
 ║  And yet it contains:                         ║
 ║  - 4 complete Tetris games running at once    ║
@@ -308,8 +338,8 @@ The **Korobeiniki** — a Russian folk song from 1861 — plays endlessly throug
 ║  All on a CPU from 1976                       ║
 ║  running at 3.58 MHz                          ║
 ║  with 16 KB of VRAM                           ║
-║  on a computer your parents probably threw    ║
-║  away in 1992.                                ║
+║  on a computer from 1983 that runs on         ║
+║  less power than your phone's screen dimmer.  ║
 ║                                               ║
 ║  Some things don't need gigabytes.            ║
 ║  Some things don't need gigahertz.            ║
@@ -325,4 +355,4 @@ The **Korobeiniki** — a Russian folk song from 1861 — plays endlessly throug
 
 ---
 
-*Tiny Tetris VS — 16 KB of friendship destruction since 2026.*
+*Tiny Tetris VS — 32 KB of friendship destruction since 2026.*

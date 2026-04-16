@@ -57,7 +57,15 @@ When you clear lines, you don't just score points — you **attack**:
 | 3 | 2 rows of garbage |
 | 4 | **4 rows of pure devastation** |
 
-Garbage rows slam into the **bottom** of your target's board, pushing everything upward. Each garbage row is filled with gray blocks except for one random gap. When the blocks reach the top — **GAME OVER**.
+**T-spin bonus**: rotate a T-piece into a tight corner (3/4 diagonal corners occupied) and garbage is **doubled**. T-spin double = 4 rows. T-spin triple = 6.
+
+**Combo bonus**: clear lines on consecutive locks and each extra combo adds **+1 garbage row**. Chain your clears.
+
+Garbage rows rise from the **bottom** of your target's board — **one row at a time** — pushing everything upward. The falling piece rides the wave. Each garbage row is solid gray blocks except for one random gap. When the blocks reach the top — **GAME OVER**.
+
+### POST-GAME STATS
+
+After every match, a **stats screen** shows each player's final numbers: score, lines, garbage sent, T-spins, longest combo, and level. Study the data. Plan your revenge.
 
 ### LAST ONE STANDING
 
@@ -142,7 +150,12 @@ This entire game fits in a **32 KB cartridge**. On a 1983 computer. Here's what'
 - **NinjaTap driver** supporting both MSXgl and Gigamix protocols simultaneously
 - **Three PSG tracks**: title-screen theme, in-game Korobeiniki, victory fanfare
 - **Sprite-based targeting system** with 4 hardware sprites, one per attacker
-- **Garbage warfare** with flash-row-shift correction and in-flight piece lock-on-garbage (pieces at landing position get locked and carried up with the shift)
+- **Garbage warfare** with gradual row-by-row rise animation, flash-row-shift correction, and in-flight piece lock-on-garbage (pieces at landing position get locked and carried up with the shift)
+- **T-spin detection** with doubled garbage output and bonus scoring
+- **Combo system**: consecutive line clears stack +1 garbage per chain level
+- **3-2-1 countdown** before game start with big block digits
+- **Post-game stats screen**: score, lines, garbage sent, T-spins, combos, level per player
+- **Attract mode**: 15 seconds idle on title → 4 CPUs play a demo match
 
 The Z80 runs at 3.58 MHz. The VDP has 16 KB of VRAM. The entire playfield is 32×24 tiles in Screen 2 mode. Every byte counts. Every cycle matters. And somehow, it all fits.
 
@@ -195,4 +208,4 @@ openmsx -machine C-BIOS_MSX1_EU -cart tinitetris4p.rom -command "plug joyporta n
 
 ---
 
-*Tiny Tetris VS — Because 16 KB is all you need to destroy friendships.*
+*Tiny Tetris VS — Because 32 KB is all you need to destroy friendships.*

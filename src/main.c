@@ -16,6 +16,7 @@ void Render_TitleReady(u8 pIdx);
 void Render_TitleCPU(u8 pIdx);
 void Render_Countdown(u8 ch);
 void Render_ClearCountdown(void);
+void Render_Stats(void);
 void Input_Init(void);
 void Input_GameUpdate(void);
 u8   Input_TitleCheck(void);
@@ -144,11 +145,20 @@ void main(void) {
                 u8 vicTimer = 0;
                 Music_Victory();
                 Render_Victory(winner);
-                while (vicTimer < 200) {
-                    Halt();
-                    Music_Update();
-                    vicTimer++;
-                    if (Keyboard_IsKeyPressed(KEY_ESC)) break;
+                {
+                    u16 waitT;
+                    // Victory screen ~4 sec
+                    for (waitT = 0; waitT < 200; waitT++) {
+                        Halt(); Music_Update();
+                        if (Keyboard_IsKeyPressed(KEY_ESC)) break;
+                    }
+                    // Stats screen ~15 sec or any key
+                    Render_Stats();
+                    for (waitT = 0; waitT < 750; waitT++) {
+                        Halt(); Music_Update();
+                        if (Keyboard_Read(8) != 0xFF) break;
+                        if (Keyboard_IsKeyPressed(KEY_ESC)) break;
+                    }
                 }
                 break;
             }

@@ -1,95 +1,76 @@
-# CONTEXTO: MSX TETRIS 4P — Port a MSXgl
+# CONTEXTO: Tiny Tetris VS — MSX1 4-Player Battle Tetris
 
 ## El juego
-Tetris para 4 jugadores simultáneos en MSX, pantalla dividida en 4 tiras verticales.
-Prototipo funcional hecho en HTML/Canvas como mockup de referencia visual.
+Tetris competitivo para 4 jugadores simultáneos en MSX1. Pantalla dividida en 4 tiras verticales de 8 columnas cada una. Prototipo HTML/Canvas como referencia visual, portado a C con MSXgl.
 
-## Restricciones de hardware respetadas
-- Chip de vídeo: TMS9918A (MSX1)
-- Resolución: 256×192 píxeles
-- Grid de caracteres: 32×24 chars de 8×8 px
-- Paleta: 16 colores fijos TMS9918A (sin inventarse ninguno)
-- Gráficos por caracteres (tiles), NO por sprites
-- Sprites reservados para efectos puntuales (máx 32, máx 4 por scanline)
+## Hardware
+- CPU: Z80 @ 3.58 MHz
+- Vídeo: TMS9918A — Screen 2 (GRAPHIC2), 256x192, 32x24 tiles, 16KB VRAM
+- Audio: AY-3-8910 PSG — 3 canales (A+B música, C libre)
+- RAM: 16 KB
+- ROM: 32 KB cartridge (ROM_32K, pages 1-2: 0x4000-0xBFFF)
 
-## Layout de pantalla (matemática exacta)
-- 4 tiras × 64px = 256px exactos (sin divisores extra)
-- Cada tira = 8 chars de ancho × 24 chars de alto
-- Cabecera: 4 filas × 8px = 32px  (score, level, next, lines)
-- Tablero:  8 cols × 20 filas × 8px = 64×160px
-- Total: 32 + 160 = 192px exactos ✓
+## Stack técnico
+- Librería: MSXgl v1.2.17 (C + SDCC)
+- Build: Node.js build system + build.bat auto-sync
+- Emulador: openMSX con NinjaTap emulado
+- Multiplayer: Ninja Tap adapter (Gigamix + MSXgl drivers simultáneos)
 
-## Paleta usada por jugador
-Los 4 colores más oscuros del TMS9918A como fondo — el contraste entre ellos ES el divisor visual, sin añadir píxeles extra.
+## Arquitectura de rendering
+- **Double-buffer**: g_NameBuffer[768] (RAM shadow de la name table)
+- **27 fixed tiles** pre-baked en los 3 bancos de Screen 2 (blocks, empty, garbage, ghost, flash, separators, dead/gameover letters)
+- **Per-row dirty tracking**: solo se flushean las filas que cambiaron
+- **Header dinámico**: tiles 128-255 de banco 0 para texto (score, lines, level, next-piece preview)
+- **Ghost piece**: outline en color del jugador, solo para humanos
 
-| Jugador | Fondo     | Bloque   | Texto  |
-|---------|-----------|----------|--------|
-| P1      | DBLUE     | CYAN     | LBLUE  |
-| P2      | DRED      | LRED     | MRED   |
-| P3      | DGREEN    | LGREEN   | MGREEN |
-| P4      | MAGENTA   | LYELLOW  | DYELLOW|
+## IA
+- Búsqueda distribuida: 2 posiciones evaluadas por tick, round-robin entre IAs
+- Base state precomputado (heights + rowCount) una vez por pieza
+- FindLandingY: cálculo O(4) de y de aterrizaje sin loops de Player_Valid
+- Piece_GetBit como macro inline (sin overhead de llamada)
+- Goal-aware: 70% apunta a 2 líneas, 22% a 3, 8% a Tetris
+- Drop cadence moderada y variable por pieza cuando alineada
+- Ejecuta best-so-far durante búsqueda (no espera a terminar)
 
-Paleta TMS9918A completa (RGB exactos):
-- BLACK   [0,0,0]
-- MGREEN  [62,184,73]
-- LGREEN  [116,208,125]
-- DBLUE   [89,85,224]
-- LBLUE   [128,118,241]
-- DRED    [185,94,81]
-- CYAN    [101,219,239]
-- MRED    [219,101,89]
-- LRED    [255,137,125]
-- DYELLOW [204,195,94]
-- LYELLOW [222,208,135]
-- DGREEN  [58,162,65]
-- MAGENTA [183,102,181]
-- GRAY    [204,204,204]
-- WHITE   [255,255,255]
+## Mecánicas de combate
+- **Targeting**: sprites 8x8 con bob, 1 por jugador, selección con Space/Button A
+- **Garbage**: tabla base {0,0,1,2,4} + T-spin (x2) + combo (+1 por chain)
+- **Garbage gradual**: sube 1 fila cada 3 ticks (animación de subida)
+- **Lock-on-landing**: si la pieza está en posición de aterrizar cuando llega garbage, se lockea y sube con el board
+- **Pieza sube con garbage**: py-- por cada fila de basura
+- **Auto-retarget**: cuando el target muere, reasigna a un vivo aleatorio
 
-## Stack del port MSX
-- Librería: MSXgl (C + SDCC, build con Node.js)
-- Target: ROM_ASCII16, 64KB (4 segmentos de 16KB)
-- Máquina: MSX1 (TMS9918A)
-- Módulos MSXgl: vdp, input, pt3/pt3_player, ayfx/ayfx_player
-
-## Mapa de memoria ROM (ASCII-16, 64KB)
-- Segmento #0 (bank#0, 0x4000, FIJO): código principal < 16KB
-- Segmento #1 (bank#1, 0x8000): gráficos — tiles, sprites, paleta (raw bin)
-- Segmento #2 (bank#1, 0x8000): música — 16 tracks PT3 + SFX ayFX (raw bin)
-- Segmento #3 (bank#1, 0x8000): reserva
-
-El código siempre está en seg#0 (bank#0 nunca se conmuta).
-bank#1 se conmuta entre seg#1 (solo al init, para cargar VRAM) y seg#2 (cada frame en ISR).
-
-## Modo de vídeo
-Screen 2 (VDP_MODE_GRAPHIC2): permite 2 colores por bloque de 8×1px.
-Los bloques del tablero son chars definidos en la tabla de patrones de VRAM.
-Char de bloque: relleno de color + highlight 1px arriba/izquierda (WHITE) + sombra 1px abajo/derecha (color oscuro del jugador).
-
-## Lógica del juego (del prototipo HTML)
-- 7 piezas estándar con rotaciones
-- Ghost piece (contorno del destino)
-- Flash al completar línea (flashTimer=20 frames, alternando WHITE cada 4 frames)
-- Score: [0,100,300,600,1000] × level según líneas simultáneas
-- Level sube cada 10 líneas, dropInterval = max(8, 48 - level*4) frames
-- Tablero guarda idx_jugador+1 (no idx_pieza) para saber el color del bloque
-
-## Audio
-- Música: PT3 player (Vortex Tracker II), 16 tracks
-- SFX: ayFX player (compatible con PT3, usa AYFX_BUFFER_PT3)
-- Update de música desde ISR VBlank (PT3_Decode() cada frame)
-- Datos de música en segmento #2, player en segmento #0 (código)
-
-## Controles (4 jugadores, 1 teclado MSX)
-- P1: flechas
-- P2: WASD  
-- P3: por definir
-- P4: por definir
-(En MSX real habría que mapear a las filas del teclado con Keyboard_Read())
+## Flujo de pantallas
+1. **Título**: logo en bloques de Tetris + "PRESS A" por jugador + timer 8s
+2. **Attract mode**: 15s sin input → 4 CPUs juegan demo, cualquier tecla → título
+3. **Countdown**: 3-2-1 en dígitos grandes de bloques
+4. **Partida**: 4 tableros simultáneos + HUD (score, lines, level, next, ghost)
+5. **Victoria**: pantalla color del ganador + "PLAYER X WINS" + fanfarria
+6. **Estadísticas**: SCO/LIN/GRB/TSP/CMB/LVL por jugador, 15s o tecla
 
 ## Ficheros del proyecto
-- msx_tetris4p.html  — prototipo visual de referencia (funcional en navegador)
-- project_config.js  — configuración MSXgl (por crear)
-- myjuego.c          — código principal (por crear)
-- data/gfx/          — tiles.bin, sprites.bin, palette.bin (por crear con MSXimg)
-- data/music/        — track00-15.bin, sfx_bank.bin (por crear con Vortex Tracker)
+```
+src/
+  main.c           — loop principal, transiciones de pantalla
+  game.c / game.h  — lógica (piezas, colisión, lock, IA, garbage, T-spin, combos)
+  render.c         — VDP rendering (double-buffer, ghost, HUD, stats, countdown)
+  input_game.c     — input keyboard + NinjaTap, filtrado human/CPU
+  music.c / music.h — PSG player (título, Korobeiniki, victoria)
+  tiles.h          — patrones, colores, font 3x5, tile indices fijos
+  msxgl_config.h   — configuración MSXgl
+  project_config.js — configuración de build
+assets/
+  korobeiniki.mid  — referencia MIDI del tema
+  msx_tetris4p.html — prototipo visual original
+builds/
+  tinitetris4p.rom — última build
+  tinitetrisNN.rom — builds versionadas (auto-prune a 5)
+```
+
+## Paleta por jugador
+| Jugador | Fondo    | Bloque   | Texto    |
+|---------|----------|----------|----------|
+| P1      | DBLUE    | CYAN     | LBLUE    |
+| P2      | DRED     | LRED     | MRED     |
+| P3      | DGREEN   | LGREEN   | MGREEN   |
+| P4      | MAGENTA  | LYELLOW  | DYELLOW  |

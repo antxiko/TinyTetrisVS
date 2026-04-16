@@ -120,6 +120,9 @@ static void Player_Init(Player* p, u8 idx) {
     p->flashCount = 0;
     p->lastWasRotate = 0;
     p->comboCount = 0;
+    p->garbageSent = 0;
+    p->tSpinCount = 0;
+    p->maxCombo = 0;
     p->aiComputed = 0;
     p->aiGoal = 2;
     p->targetPlayer = (idx + 1) % NUM_PLAYERS;
@@ -220,12 +223,18 @@ static void Player_Lock(Player* p) {
             if (isTSpin) gCount = p->flashCount * 2;
             // Combo bonus: +1 per consecutive clear beyond the first
             if (p->comboCount > 1) gCount += (p->comboCount - 1);
-            if (gCount > 0)
+            if (gCount > 0) {
                 Player_AddGarbage(&g_Players[p->targetPlayer], gCount);
+                p->garbageSent += gCount;
+            }
         }
+        // Track stats
+        if (isTSpin) p->tSpinCount++;
+        if (p->comboCount > p->maxCombo) p->maxCombo = p->comboCount;
+
         p->flashTimer = FLASH_DURATION;
         p->score += scoreTable[p->flashCount];
-        if (isTSpin) p->score += p->flashCount * 3;  // bonus score for T-spin
+        if (isTSpin) p->score += p->flashCount * 3;
         p->lines += p->flashCount;
         p->level = (p->lines / LINES_PER_LVL) + 1;
         {

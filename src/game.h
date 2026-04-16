@@ -74,6 +74,11 @@ typedef struct {
     u8  aiBaseHeights[BOARD_W];  // precomputed column heights
     u8  aiBaseRowCount[BOARD_H]; // precomputed filled-cells per row
 
+    // Stats (tracked per match for post-game screen)
+    u8  garbageSent;    // total garbage rows sent to others
+    u8  tSpinCount;     // number of T-spins landed
+    u8  maxCombo;       // longest combo streak
+
     // Targeting
     u8  targetPlayer;   // index of player we're attacking (0-3)
     u8  boardDirty;     // set by garbage — forces full board redraw
