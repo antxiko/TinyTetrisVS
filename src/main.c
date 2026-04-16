@@ -14,6 +14,8 @@ void Render_Victory(u8 winnerIdx);
 void Render_TitleScreen(void);
 void Render_TitleReady(u8 pIdx);
 void Render_TitleCPU(u8 pIdx);
+void Render_Countdown(u8 ch);
+void Render_ClearCountdown(void);
 void Input_Init(void);
 void Input_GameUpdate(void);
 u8   Input_TitleCheck(void);
@@ -23,6 +25,8 @@ u8   Input_TitleCheck(void);
 
 // Auto-start timer after first human joins (~8 seconds at 50Hz)
 #define TITLE_COUNTDOWN  400
+// Attract mode: 4 CPUs play after ~15 seconds of no input on title
+#define ATTRACT_TIMEOUT  750
 
 void main(void) {
     u8 i, j;
@@ -42,7 +46,8 @@ void main(void) {
         Music_Init();  // Start title music
         {
             u8 ready = 0;
-            u16 timer = 0;  // 0 = not started; counts down after first join
+            u16 timer = 0;      // counts down after first human join
+            u16 attract = ATTRACT_TIMEOUT;  // counts down to attract mode
             Render_TitleScreen();
             while (1) {
                 Halt();
@@ -58,20 +63,23 @@ void main(void) {
                             newJoins = 1;
                         }
                     }
-                    // Reset timer on any new join
-                    if (newJoins) timer = TITLE_COUNTDOWN;
-                    // All humans joined → start immediately
+                    if (newJoins) { timer = TITLE_COUNTDOWN; attract = 0; }
                     if (ready == 0x0F) break;
                 }
-                // Count down if timer active; start when it hits 0
+                // Human join timer
                 if (timer > 0) {
                     timer--;
                     if (timer == 0 && ready != 0) break;
                 }
+                // Attract mode timer: no input → 4 CPUs demo
+                if (attract > 0) {
+                    attract--;
+                    if (attract == 0 && ready == 0) break;
+                }
                 if (Keyboard_IsKeyPressed(KEY_ESC)) { Bios_Exit(0); }
             }
 
-            // Commit slot configuration
+            // Commit slot configuration (ready=0 means attract: all CPU)
             g_HumanMask = ready;
 
             // Show CPU labels for unclaimed slots
@@ -79,14 +87,24 @@ void main(void) {
                 if (!(ready & (1 << i))) Render_TitleCPU(i);
             }
 
-            // Brief pause before starting
-            for (i = 0; i < 60; i++) { Halt(); Music_Update(); }
+            // Brief pause (shorter for attract)
+            for (i = 0; i < (ready ? 60 : 20); i++) { Halt(); Music_Update(); }
         }
 
         // --- GAME ---
         Game_Init();
         Music_StartGame();
         Render_GameBegin();
+
+        // 3-2-1 countdown
+        Render_Countdown('3');
+        for (i = 0; i < 50; i++) { Halt(); Music_Update(); }
+        Render_Countdown('2');
+        for (i = 0; i < 50; i++) { Halt(); Music_Update(); }
+        Render_Countdown('1');
+        for (i = 0; i < 50; i++) { Halt(); Music_Update(); }
+        Render_ClearCountdown();
+
         Render_Frame();
         lastJiffy = JIFFY;
 
@@ -101,17 +119,18 @@ void main(void) {
             Input_GameUpdate();
 
             for (j = 0; j < elapsed; j++) {
-                // Round-robin: only one AI gets a turn to think each tick.
-                // Others just execute their already-computed plan (cheap).
-                u8 aiTurn = g_Frame & 3;
-                for (i = 0; i < NUM_PLAYERS; i++) {
-                    if (!(g_HumanMask & (1 << i))) {
-                        // Only the "turn" AI may do the heavy search this tick;
-                        // others run their execution step only if already planned.
-                        if (i == aiTurn || g_Players[i].aiComputed)
-                            Player_AI(&g_Players[i], g_Frame);
+                // Round-robin: only one AI searches per tick. Others execute
+                // their plan every OTHER tick to cut CPU cost in half.
+                {
+                    u8 aiTurn = g_Frame & 3;
+                    u8 execTick = g_Frame & 1;  // AI executes on odd frames
+                    for (i = 0; i < NUM_PLAYERS; i++) {
+                        if (!(g_HumanMask & (1 << i))) {
+                            if (i == aiTurn || (g_Players[i].aiComputed && execTick))
+                                Player_AI(&g_Players[i], g_Frame);
+                        }
+                        Player_Update(&g_Players[i]);
                     }
-                    Player_Update(&g_Players[i]);
                 }
                 Music_Update();
                 g_Frame++;
@@ -134,7 +153,16 @@ void main(void) {
                 break;
             }
 
-            if (Keyboard_IsKeyPressed(KEY_ESC)) { Bios_Exit(0); }
+            // Attract mode: any key → back to title
+            if (g_HumanMask == 0) {
+                u8 row8 = Keyboard_Read(8);
+                if (row8 != 0xFF) break;  // any key on row 8 pressed
+            }
+
+            if (Keyboard_IsKeyPressed(KEY_ESC)) {
+                if (g_HumanMask == 0) break;  // attract → title
+                Bios_Exit(0);                 // real game → quit
+            }
         }
     }
 }

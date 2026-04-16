@@ -37,18 +37,11 @@ const PieceDef g_Pieces[NUM_PIECES] = {
 // HELPERS
 // ============================================================================
 
-// Bitmask lookup: bit positions 15..0 → mask high byte or low byte
-// bits stored as: row0=bits[15:12], row1=bits[11:8], row2=bits[7:4], row3=bits[3:0]
-static const u16 g_BitMask[4][4] = {
-    { 0x8000, 0x4000, 0x2000, 0x1000 },  // row 0
-    { 0x0800, 0x0400, 0x0200, 0x0100 },  // row 1
-    { 0x0080, 0x0040, 0x0020, 0x0010 },  // row 2
-    { 0x0008, 0x0004, 0x0002, 0x0001 },  // row 3
-};
+// Piece_GetBit is now a macro in game.h (avoids function call overhead)
 
-u8 Piece_GetBit(u16 bits, u8 row, u8 col) {
-    return (bits & g_BitMask[row][col]) ? 1 : 0;
-}
+// Forward declarations
+static void Player_Lock(Player* p);
+static void AddOneGarbageRow(Player* p);
 
 const PieceRot* Piece_GetRot(u8 pieceIdx, u8 rot) {
     return &g_Pieces[pieceIdx].rots[rot % g_Pieces[pieceIdx].numRots];
@@ -90,7 +83,7 @@ void Player_Spawn(Player* p) {
     p->aiEvalRot = 0;
     p->aiEvalCol = 0;
     p->aiBestScore = -32000;
-    p->aiTargetX = p->px;
+    p->aiTargetX = -99;     // sentinel: "not yet decided"
     p->aiTargetRot = 0;
 
     // Pick AI goal for this piece: mostly 2 lines, sometimes 3, rarely 4
@@ -125,10 +118,14 @@ static void Player_Init(Player* p, u8 idx) {
     p->softDrop = 0;
     p->flashTimer = 0;
     p->flashCount = 0;
+    p->lastWasRotate = 0;
+    p->comboCount = 0;
     p->aiComputed = 0;
     p->aiGoal = 2;
     p->targetPlayer = (idx + 1) % NUM_PLAYERS;
     p->boardDirty = 0;
+    p->pendingGarbage = 0;
+    p->garbageTimer = 0;
 
     p->pieceIdx = Math_GetRandom8() % NUM_PIECES;
     p->nextIdx = Math_GetRandom8() % NUM_PIECES;
@@ -146,8 +143,10 @@ static void Player_Init(Player* p, u8 idx) {
 
 void Player_Move(Player* p, i8 dx) {
     if (p->dead || p->flashTimer > 0) return;
-    if (Player_Valid(p, p->pieceIdx, p->rot, p->px + dx, p->py))
+    if (Player_Valid(p, p->pieceIdx, p->rot, p->px + dx, p->py)) {
         p->px += dx;
+        p->lastWasRotate = 0;
+    }
 }
 
 void Player_Rotate(Player* p) {
@@ -155,11 +154,11 @@ void Player_Rotate(Player* p) {
     if (p->dead || p->flashTimer > 0) return;
     newRot = (p->rot + 1) % g_Pieces[p->pieceIdx].numRots;
     if (Player_Valid(p, p->pieceIdx, newRot, p->px, p->py))
-        p->rot = newRot;
+        { p->rot = newRot; p->lastWasRotate = 1; }
     else if (Player_Valid(p, p->pieceIdx, newRot, p->px - 1, p->py))
-        { p->px--; p->rot = newRot; }
+        { p->px--; p->rot = newRot; p->lastWasRotate = 1; }
     else if (Player_Valid(p, p->pieceIdx, newRot, p->px + 1, p->py))
-        { p->px++; p->rot = newRot; }
+        { p->px++; p->rot = newRot; p->lastWasRotate = 1; }
 }
 
 static void Player_Lock(Player* p) {
@@ -196,15 +195,37 @@ static void Player_Lock(Player* p) {
     }
 
     if (p->flashCount > 0) {
-        // Send garbage to targeted player
+        // T-spin detection: if T-piece and last action was rotate,
+        // check if 3 of 4 diagonal corners around center are occupied/OOB.
+        u8 isTSpin = 0;
+        if (p->pieceIdx == 2 && p->lastWasRotate) {
+            i8 cx = p->px + 1;
+            i8 cy = p->py + 1;
+            u8 corners = 0;
+            if (cx-1 < 0 || cy-1 < 0 || p->board[cy-1][cx-1]) corners++;
+            if (cx+1 >= BOARD_W || cy-1 < 0 || p->board[cy-1][cx+1]) corners++;
+            if (cx-1 < 0 || cy+1 >= BOARD_H || p->board[cy+1][cx-1]) corners++;
+            if (cx+1 >= BOARD_W || cy+1 >= BOARD_H || p->board[cy+1][cx+1]) corners++;
+            if (corners >= 3) isTSpin = 1;
+        }
+
+        // Combo tracking: consecutive locks with line clears
+        p->comboCount++;
+
+        // Garbage = base + T-spin bonus + combo bonus
         {
             static const u8 garbageTable[5] = { 0, 0, 1, 2, 4 };
             u8 gCount = garbageTable[p->flashCount];
+            // T-spin: 1→2, 2→4, 3→6 garbage (doubles the attack)
+            if (isTSpin) gCount = p->flashCount * 2;
+            // Combo bonus: +1 per consecutive clear beyond the first
+            if (p->comboCount > 1) gCount += (p->comboCount - 1);
             if (gCount > 0)
                 Player_AddGarbage(&g_Players[p->targetPlayer], gCount);
         }
         p->flashTimer = FLASH_DURATION;
         p->score += scoreTable[p->flashCount];
+        if (isTSpin) p->score += p->flashCount * 3;  // bonus score for T-spin
         p->lines += p->flashCount;
         p->level = (p->lines / LINES_PER_LVL) + 1;
         {
@@ -212,14 +233,17 @@ static void Player_Lock(Player* p) {
             p->dropInterval = (di < DROP_MIN) ? DROP_MIN : di;
         }
     } else {
+        p->comboCount = 0;  // no lines cleared → reset combo
         Player_Spawn(p);
     }
 }
 
 void Player_Drop(Player* p) {
     if (p->dead || p->flashTimer > 0) return;
-    if (Player_Valid(p, p->pieceIdx, p->rot, p->px, p->py + 1))
+    if (Player_Valid(p, p->pieceIdx, p->rot, p->px, p->py + 1)) {
         p->py++;
+        p->lastWasRotate = 0;  // drop cancels rotation flag
+    }
     else
         Player_Lock(p);
 }
@@ -258,6 +282,17 @@ void Player_Update(Player* p) {
                 p->targetPlayer = cand;
                 break;
             }
+        }
+    }
+
+    // Gradual garbage delivery: 1 row every 3 ticks (visual rise effect)
+    if (p->pendingGarbage > 0 && p->flashTimer == 0) {
+        p->garbageTimer++;
+        if (p->garbageTimer >= 3) {
+            p->garbageTimer = 0;
+            AddOneGarbageRow(p);
+            p->pendingGarbage--;
+            if (p->dead) return;
         }
     }
 
@@ -455,15 +490,16 @@ void Player_AI(Player* p, u8 frame) {
                     p->aiComputed = 1;
             }
         }
-        // Still searching — don't execute moves yet
-        if (!p->aiComputed) return;
+        // Fall through: execute with current best-so-far target even while
+        // still searching. The piece starts moving toward the best position
+        // found so far, and may correct course as search progresses.
     }
 
     // --- EXECUTION PHASE: one step per call ---
-    // AI never uses human soft-drop (too fast). Instead, once aligned, we
-    // gently force one extra drop every aiDropDelay ticks — a steady cadence
-    // that sits between natural fall and soft-drop.
     p->softDrop = 0;
+
+    // Don't execute until search has found at least one valid position
+    if (p->aiTargetX == -99) return;
 
     if (p->rot != p->aiTargetRot) {
         p->rot = p->aiTargetRot % g_Pieces[p->pieceIdx].numRots;
@@ -503,52 +539,53 @@ void Player_CycleTarget(Player* p, u8 pIdx) {
     }
 }
 
-void Player_AddGarbage(Player* p, u8 count) {
-    u8 i, c;
-    u8 gap;
-    if (p->dead) return;
+// Add a single garbage row: shift board up 1, fill bottom, adjust flash rows.
+static void AddOneGarbageRow(Player* p) {
+    u8 r, c, gap;
 
-    // If the target's piece is at landing position (can't drop further), lock
-    // it first so it becomes part of the board and rides the shift up with
-    // the rest. Otherwise it would appear stuck inside the new garbage.
-    // Skip if already mid-flash (piece already locked, waiting to clear).
+    // Lock piece if at landing (rides the shift up)
     if (p->flashTimer == 0 &&
         !Player_Valid(p, p->pieceIdx, p->rot, p->px, p->py + 1)) {
         Player_Lock(p);
         if (p->dead) return;
     }
 
-    p->boardDirty = 1;  // mark dirty BEFORE any death check so partial shifts render
-
-    // If target is mid-flash, shift their flashRows to match the upward shift.
-    // Rows pushed off the top are dropped; if all drop, cancel the flash.
-    if (p->flashTimer > 0) {
-        u8 k;
-        u8 newCount = 0;
-        for (k = 0; k < p->flashCount; k++) {
-            i8 nr = (i8)p->flashRows[k] - (i8)count;
-            if (nr >= 0)
-                p->flashRows[newCount++] = (u8)nr;
-        }
-        p->flashCount = newCount;
-        if (newCount == 0) p->flashTimer = 0;
+    // Death check: top row occupied → game over
+    for (c = 0; c < BOARD_W; c++) {
+        if (p->board[0][c]) { p->dead = 1; return; }
     }
 
-    for (i = 0; i < count; i++) {
-        u8 r;
-        // Check if top row has blocks — if so, player dies
-        for (c = 0; c < BOARD_W; c++) {
-            if (p->board[0][c]) { p->dead = 1; return; }
-        }
-        // Shift entire board up by 1
-        for (r = 0; r < BOARD_H - 1; r++)
-            for (c = 0; c < BOARD_W; c++)
-                p->board[r][c] = p->board[r + 1][c];
-        // Fill bottom row with garbage (all filled except one random gap)
-        gap = Math_GetRandom8() % BOARD_W;
+    // Shift entire board up by 1
+    for (r = 0; r < BOARD_H - 1; r++)
         for (c = 0; c < BOARD_W; c++)
-            p->board[BOARD_H - 1][c] = (c == gap) ? 0 : 5;  // 5 = garbage color
+            p->board[r][c] = p->board[r + 1][c];
+
+    // Fill bottom row with garbage
+    gap = Math_GetRandom8() % BOARD_W;
+    for (c = 0; c < BOARD_W; c++)
+        p->board[BOARD_H - 1][c] = (c == gap) ? 0 : 5;
+
+    // Push falling piece up with the shift (so it doesn't sink into garbage)
+    if (p->py > 0) p->py--;
+
+    // Adjust flash rows by 1 if mid-flash
+    if (p->flashTimer > 0) {
+        u8 k, nc = 0;
+        for (k = 0; k < p->flashCount; k++) {
+            if (p->flashRows[k] > 0) p->flashRows[nc++] = p->flashRows[k] - 1;
+        }
+        p->flashCount = nc;
+        if (nc == 0) p->flashTimer = 0;
     }
+
+    p->boardDirty = 1;
+}
+
+// Queue garbage for gradual delivery (1 row every 3 ticks for visual effect)
+void Player_AddGarbage(Player* p, u8 count) {
+    if (p->dead) return;
+    p->pendingGarbage += count;
+    p->garbageTimer = 0;  // start delivering immediately next tick
 }
 
 // ============================================================================

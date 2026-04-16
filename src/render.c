@@ -350,9 +350,12 @@ void Render_IdentityMode(void) {
 // ============================================================================
 
 // Render the next-piece preview (4×2 area at rows 0-1, cols 4-7)
+// Best rotation for 4x2 preview area: L and J need horizontal rotation
+static const u8 g_PreviewRot[NUM_PIECES] = { 0, 0, 0, 0, 0, 1, 1 };
+
 static void RenderNextPreview(u8 pIdx, u8 pieceIdx) {
     u8 sx = pIdx * 8 + 4;  // preview starts at col 4 of player strip
-    const PieceRot* s = Piece_GetRot(pieceIdx, 0);
+    const PieceRot* s = Piece_GetRot(pieceIdx, g_PreviewRot[pieceIdx]);
     u8 colBlock[8], colEmpty[8];
     u8 r, c;
     Tiles_ColorBlock(colBlock, pIdx);
@@ -398,6 +401,7 @@ static void RenderHeader(const Player* p, u8 pIdx) {
         PutChar(sx + 5, 2, 'V', pIdx, 0);
         Tiles_ColorEmpty(g_CBuf, pIdx);
         WriteTileData(2, (u8)(128 + 64 + sx + 6), g_PatEmpty, g_CBuf);
+        WriteTileData(2, (u8)(128 + 64 + sx + 7), g_PatEmpty, g_CBuf);
         // Row 3: separator (solid block color)
         Tiles_ColorSeparator(g_CBuf, pIdx);
         for (c = 0; c < 8; c++)
@@ -709,6 +713,45 @@ void Render_Frame(void) {
 }
 
 // ============================================================================
+// COUNTDOWN — big digit on each player's board before game starts
+// ============================================================================
+
+void Render_Countdown(u8 ch) {
+    u8 idx = (ch >= 32 && ch < 32 + FONT_COUNT) ? ch - 32 : 0;
+    const u8* pat = g_Font[idx];
+    u8 p, r, c;
+
+    for (p = 0; p < NUM_PLAYERS; p++) {
+        u8 sx = p * 8 + 2;
+        u8 sy = 11;    // rows 11-15 (centered on 20-row board)
+        // Clear a 4×7 area
+        for (r = 0; r < 7; r++)
+            for (c = 0; c < 4; c++)
+                PutBoard(sx + c, sy + r, TILE_EMPTY_P0 + p);
+        // Draw 3×5 glyph as block tiles
+        for (r = 0; r < 5; r++) {
+            u8 row = pat[r + 1];
+            for (c = 0; c < 3; c++) {
+                if (row & (0x20 >> c))
+                    PutBoard(sx + c, sy + 1 + r, (u8)(TILE_BLOCK_P0 + p));
+            }
+        }
+    }
+    FlushBoard();
+}
+
+void Render_ClearCountdown(void) {
+    u8 p, r, c;
+    for (p = 0; p < NUM_PLAYERS; p++) {
+        u8 sx = p * 8;
+        for (r = HEADER_ROWS; r < 24; r++)
+            for (c = 0; c < 8; c++)
+                PutBoard(sx + c, r, TILE_EMPTY_P0 + p);
+    }
+    FlushBoard();
+}
+
+// ============================================================================
 // TITLE SCREEN (identity mode, dynamic writes)
 // ============================================================================
 
@@ -732,6 +775,10 @@ void Render_TitleScreen(void) {
 
     // Ensure we're in identity mode
     Render_IdentityMode();
+
+    // Hide all sprites (targeting arrows from previous game/attract)
+    for (i = 0; i < 32; i++)
+        VDP_SetSpriteSM1(i, 0, 208, 0, 0);
 
     for (i = 0; i < 8; i++)
         colBg[i] = (u8)((COLOR_BLACK << 4) | COLOR_BLACK);
