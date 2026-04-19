@@ -1,8 +1,8 @@
 // ____________________________________________________________________________
 // Input handling — TiniTetris 4P
-// P1: keyboard (arrows) OR NinjaTap joystick 0
-// P2-P4: NinjaTap joysticks 1-3
-// Falls back to keyboard-only if no NinjaTap detected.
+// Two modes selected from the title screen:
+//   KB+JOY:    P1=arrows+Space, P2=WASD+Ctrl, P3=Joy1, P4=Joy2
+//   NINJATAP:  P1-P4 all on NinjaTap adapter
 // ____________________________________________________________________________
 
 #include "msxgl.h"
@@ -16,14 +16,17 @@
 // Per-player repeat timers
 static u8 s_repTimer[NUM_PLAYERS] = { 0, 0, 0, 0 };
 
-// Previous keyboard row states (for P1 keyboard)
-static u8 s_prev8 = 0xFF;
+// Previous keyboard row states
+static u8 s_prev8  = 0xFF;  // P1: row 8 (arrows + space)
+static u8 s_prevP2_r2 = 0xFF;  // P2: row 2 (A, D)
+static u8 s_prevP2_r4 = 0xFF;  // P2: row 4 (W, S)
+static u8 s_prevP2_r6 = 0xFF;  // P2: row 6 (CTRL)
 
 // NinjaTap state
-static u8 s_ntapPorts = 0;  // 0 = not detected
+static u8 s_ntapPorts = 0;
 
 // ============================================================================
-// INIT — call once at startup
+// INIT
 // ============================================================================
 
 void Input_Init(void) {
@@ -38,18 +41,15 @@ void Input_Init(void) {
 static void DoPlayer(Player* p, u8 pNum,
                      u8 left, u8 right, u8 rotate, u8 drop,
                      u8 pLeft, u8 pRight, u8 pRotate, u8 pDrop) {
-    // Rotate on edge
     if (rotate && !pRotate)
         Player_Rotate(p);
 
-    // Soft drop: hold down = fast, release = normal
     p->softDrop = drop;
     if (drop && !pDrop) {
         Player_Drop(p);
         p->dropTimer = 0;
     }
 
-    // Left/right with auto-repeat
     if (left && !right) {
         if (!pLeft) {
             Player_Move(p, -1);
@@ -78,29 +78,36 @@ static void DoPlayer(Player* p, u8 pNum,
 }
 
 // ============================================================================
-// NinjaTap joystick → DoPlayer
-// UP = rotate, Down = soft drop, Button A = cycle target
+// NinjaTap / standard joystick → DoPlayer
 // ============================================================================
+
+// Own button-state tracking — g_NTap_Prev bit 7 is unreliable on some
+// real NinjaTap hardware, so we track the physical A button ourselves.
+static u8 s_joyBtnPrev[4] = { 0, 0, 0, 0 };
 
 static void DoJoyPlayer(u8 pNum, u8 joyIdx) {
     u8 l  = NTap_IsPressed(joyIdx, NTAP_LEFT);
     u8 r  = NTap_IsPressed(joyIdx, NTAP_RIGHT);
-    u8 u  = NTap_IsPressed(joyIdx, NTAP_UP);     // UP = rotate
+    u8 u  = NTap_IsPressed(joyIdx, NTAP_UP);
     u8 d  = NTap_IsPressed(joyIdx, NTAP_DOWN);
-    u8 a  = NTap_IsPressed(joyIdx, NTAP_A);      // A = cycle target
     u8 pl = (g_NTap_Prev[joyIdx] & NTAP_LEFT) == 0;
     u8 pr = (g_NTap_Prev[joyIdx] & NTAP_RIGHT) == 0;
     u8 pu = (g_NTap_Prev[joyIdx] & NTAP_UP) == 0;
     u8 pd = (g_NTap_Prev[joyIdx] & NTAP_DOWN) == 0;
-    u8 pa = (g_NTap_Prev[joyIdx] & NTAP_A) == 0;
     DoPlayer(&g_Players[pNum], pNum, l, r, u, d, pl, pr, pu, pd);
-    // Cycle target on button A edge
-    if (a && !pa)
-        Player_CycleTarget(&g_Players[pNum], pNum);
+
+    // Physical button A = MSXgl NTAP_B (swapped in library).
+    // Edge-detect with our own prev to avoid g_NTap_Prev bit 7 issues.
+    {
+        u8 btn = NTap_IsPressed(joyIdx, NTAP_B);
+        if (btn && !s_joyBtnPrev[joyIdx])
+            Player_CycleTarget(&g_Players[pNum], pNum);
+        s_joyBtnPrev[joyIdx] = btn;
+    }
 }
 
 // ============================================================================
-// Keyboard P1 (arrows + UP=rotate, DOWN=drop)
+// Keyboard P1 (arrows + Space = target)
 // ============================================================================
 
 static void DoKeyboardP1(void) {
@@ -114,7 +121,6 @@ static void DoKeyboardP1(void) {
     u8 pd = !(s_prev8 & 0x40);
     u8 pr = !(s_prev8 & 0x80);
     DoPlayer(&g_Players[0], 0, l, r, u, d, pl, pr, pu, pd);
-    // Space = cycle target (also row 8, bit 0)
     {
         u8 sp  = !(row8 & 0x01);
         u8 psp = !(s_prev8 & 0x01);
@@ -125,23 +131,58 @@ static void DoKeyboardP1(void) {
 }
 
 // ============================================================================
-// PUBLIC — call every frame
+// Keyboard P2 (WASD + CTRL = target)
+// MSX keyboard matrix: A=row2 bit0, D=row2 bit3, W=row4 bit6, S=row4 bit2,
+//                      CTRL=row6 bit1
 // ============================================================================
 
+static void DoKeyboardP2(void) {
+    u8 row2 = Keyboard_Read(2);
+    u8 row4 = Keyboard_Read(4);
+    u8 row6 = Keyboard_Read(6);
+
+    u8 l  = !(row2 & 0x01);         // A = left
+    u8 r  = !(row2 & 0x08);         // D = right
+    u8 u  = !(row4 & 0x40);         // W = rotate
+    u8 d  = !(row4 & 0x04);         // S = soft drop
+
+    u8 pl = !(s_prevP2_r2 & 0x01);
+    u8 pr = !(s_prevP2_r2 & 0x08);
+    u8 pu = !(s_prevP2_r4 & 0x40);
+    u8 pd = !(s_prevP2_r4 & 0x04);
+
+    DoPlayer(&g_Players[1], 1, l, r, u, d, pl, pr, pu, pd);
+
+    // CTRL = cycle target
+    {
+        u8 ct  = !(row6 & 0x02);
+        u8 pct = !(s_prevP2_r6 & 0x02);
+        if (ct && !pct)
+            Player_CycleTarget(&g_Players[1], 1);
+    }
+
+    s_prevP2_r2 = row2;
+    s_prevP2_r4 = row4;
+    s_prevP2_r6 = row6;
+}
+
 // ============================================================================
-// TITLE SCREEN — check who pressed A/Space (edge-triggered)
+// TITLE SCREEN — check who pressed their button (edge-triggered)
 // Returns bitmask: bit 0=P1, bit 1=P2, etc.
+// Also checks F1 for mode toggle (returned as bit 7).
 // ============================================================================
 
 static u8 s_titlePrev = 0xFF;
 static u8 s_titleKeyPrev = 0xFF;
+static u8 s_titleF1Prev = 0xFF;
 static u8 s_titleJoyPrev[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
 
 u8 Input_TitleCheck(void) {
     u8 result = 0;
     u8 row8 = Keyboard_Read(8);
+    u8 row6 = Keyboard_Read(6);
 
-    // P1: Space (bit 0) as confirm
+    // P1: Space (row 8 bit 0)
     {
         u8 sp = !(row8 & 0x01);
         u8 psp = !(s_titlePrev & 0x01);
@@ -149,7 +190,22 @@ u8 Input_TitleCheck(void) {
     }
     s_titlePrev = row8;
 
-    // Debug keys: 1,2,3,4 on keyboard (row 0: bit 1=1, bit 2=2, bit 3=3, bit 4=4)
+    // P2 in KB+JOY mode: CTRL (row 6 bit 1)
+    if (g_InputMode == 0) {
+        u8 ct = !(row6 & 0x02);
+        u8 pct = !(s_titleF1Prev & 0x02);  // reuse for ctrl prev
+        if (ct && !pct) result |= 0x02;
+    }
+
+    // F1 (row 6 bit 5): mode toggle → bit 7
+    {
+        u8 f1 = !(row6 & 0x20);
+        u8 pf1 = !(s_titleF1Prev & 0x20);
+        if (f1 && !pf1) result |= 0x80;
+    }
+    s_titleF1Prev = row6;
+
+    // Number keys 1-4 (row 0: bits 1-4)
     {
         u8 row0 = Keyboard_Read(0);
         u8 k;
@@ -161,15 +217,23 @@ u8 Input_TitleCheck(void) {
         s_titleKeyPrev = row0;
     }
 
-    // NinjaTap players
+    // Joystick/NinjaTap players — use NTAP_B (= physical A, swapped in MSXgl)
+    // with our own edge tracking to avoid g_NTap_Prev bit 7 issues on real HW.
     if (s_ntapPorts >= 2) {
         u8 p;
         NTap_Update();
         for (p = 0; p < 4; p++) {
-            u8 a = NTap_IsPressed(p, NTAP_A);
-            u8 pa = (s_titleJoyPrev[p] & NTAP_A) == 0;
-            if (a && !pa) result |= (u8)(1 << p);
-            s_titleJoyPrev[p] = NTap_GetData(p);
+            u8 a = NTap_IsPressed(p, NTAP_B);
+            u8 pa = s_titleJoyPrev[p];
+            if (a && !pa) {
+                // In KB+JOY mode: joy0→P3, joy1→P4
+                // In NINJATAP mode: joy0→P1, joy1→P2, joy2→P3, joy3→P4
+                if (g_InputMode == 0)
+                    result |= (u8)(1 << (p + 2));  // P3=bit2, P4=bit3
+                else
+                    result |= (u8)(1 << p);
+            }
+            s_titleJoyPrev[p] = a;
         }
     }
 
@@ -181,19 +245,23 @@ u8 Input_TitleCheck(void) {
 // ============================================================================
 
 void Input_GameUpdate(void) {
-    if (s_ntapPorts >= 2) {
-        NTap_Update();
-
+    if (g_InputMode == 0) {
+        // KB+JOY mode: P1=keyboard, P2=WASD, P3/P4=standard joysticks
         if (g_HumanMask & 0x01) DoKeyboardP1();
-
-        if (s_ntapPorts >= 5) {
+        if (g_HumanMask & 0x02) DoKeyboardP2();
+        if (s_ntapPorts >= 2) {
+            NTap_Update();
+            if (g_HumanMask & 0x04) DoJoyPlayer(2, 0);  // P3 = joy port A
+            if (g_HumanMask & 0x08) DoJoyPlayer(3, 1);  // P4 = joy port B
+        }
+    } else {
+        // NINJATAP mode: all 4 on NinjaTap
+        if (s_ntapPorts >= 2) {
+            NTap_Update();
+            if (g_HumanMask & 0x01) DoJoyPlayer(0, 0);
             if (g_HumanMask & 0x02) DoJoyPlayer(1, 1);
             if (g_HumanMask & 0x04) DoJoyPlayer(2, 2);
             if (g_HumanMask & 0x08) DoJoyPlayer(3, 3);
-        } else {
-            if (g_HumanMask & 0x02) DoJoyPlayer(1, 1);
         }
-    } else {
-        if (g_HumanMask & 0x01) DoKeyboardP1();
     }
 }

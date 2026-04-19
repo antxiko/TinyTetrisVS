@@ -853,6 +853,47 @@ void Render_TitleReady(u8 pIdx) {
     PutTileIdentity(sx + 5, 21, g_Font['Y'-32], colR);
 }
 
+void Render_TitleMode(void) {
+    u8 colW[8], colBg[8], i;
+    for (i = 0; i < 8; i++) {
+        colW[i]  = (u8)((COLOR_WHITE << 4) | COLOR_BLACK);
+        colBg[i] = (u8)((COLOR_BLACK << 4) | COLOR_BLACK);
+    }
+    // Clear row 23
+    for (i = 0; i < 32; i++)
+        PutTileIdentity(i, 23, g_PatEmpty, colBg);
+    // Show mode: "F1:" + mode name
+    PutTileIdentity(2, 23, g_Font['F'-32], colW);
+    PutTileIdentity(3, 23, g_Font['1'-32], colW);
+    if (g_InputMode == 0) {
+        // "KB+JOY"
+        PutTileIdentity(5, 23, g_Font['K'-32], colW);
+        PutTileIdentity(6, 23, g_Font['E'-32], colW);
+        PutTileIdentity(7, 23, g_Font['Y'-32], colW);
+        // Player layout hint
+        {
+            u8 colD[8];
+            for (i = 0; i < 8; i++)
+                colD[i] = (u8)((COLOR_GRAY << 4) | COLOR_BLACK);
+            // "P1:ARROWS P2:WASD P3:J1 P4:J2"
+            PutTileIdentity(10, 23, g_Font['P'-32], colD);
+            PutTileIdentity(11, 23, g_Font['1'-32], colD);
+            PutTileIdentity(12, 23, g_Font['P'-32], colD);
+            PutTileIdentity(13, 23, g_Font['2'-32], colD);
+            PutTileIdentity(15, 23, g_Font['P'-32], colD);
+            PutTileIdentity(16, 23, g_Font['3'-32], colD);
+            PutTileIdentity(17, 23, g_Font['P'-32], colD);
+            PutTileIdentity(18, 23, g_Font['4'-32], colD);
+        }
+    } else {
+        // "NTAP"
+        PutTileIdentity(5, 23, g_Font['N'-32], colW);
+        PutTileIdentity(6, 23, g_Font['T'-32], colW);
+        PutTileIdentity(7, 23, g_Font['A'-32], colW);
+        PutTileIdentity(8, 23, g_Font['P'-32], colW);
+    }
+}
+
 void Render_TitleCPU(u8 pIdx) {
     u8 colC[8], colBg[8], i, x;
     const PlayerColors* pc = &g_PlayerColors[pIdx];

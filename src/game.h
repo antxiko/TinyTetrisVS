@@ -117,4 +117,5 @@ void Player_AddGarbage(Player* p, u8 count);
 extern Player g_Players[NUM_PLAYERS];
 extern u8     g_Frame;
 extern u8     g_HumanMask;  // bit i = 1 → player i is human, else AI
+extern u8     g_InputMode;  // 0 = KB+JOY, 1 = NINJATAP
 extern const PieceDef g_Pieces[NUM_PIECES];

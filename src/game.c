@@ -9,7 +9,8 @@
 // ============================================================================
 Player g_Players[NUM_PLAYERS];
 u8     g_Frame = 0;
-u8     g_HumanMask = 0x01;  // bit i = 1 → player i is human. Default: only P1.
+u8     g_HumanMask = 0x01;
+u8     g_InputMode = 0;     // 0 = KB+JOY, 1 = NINJATAP
 
 // ============================================================================
 // PIECES — packed bitmask

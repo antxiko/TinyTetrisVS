@@ -12,6 +12,7 @@ void Render_GameBegin(void);
 void Render_Frame(void);
 void Render_Victory(u8 winnerIdx);
 void Render_TitleScreen(void);
+void Render_TitleMode(void);
 void Render_TitleReady(u8 pIdx);
 void Render_TitleCPU(u8 pIdx);
 void Render_Countdown(u8 ch);
@@ -50,6 +51,7 @@ void main(void) {
             u16 timer = 0;      // counts down after first human join
             u16 attract = ATTRACT_TIMEOUT;  // counts down to attract mode
             Render_TitleScreen();
+            Render_TitleMode();
             while (1) {
                 Halt();
                 Music_Update();
@@ -57,6 +59,13 @@ void main(void) {
                     u8 pressed = Input_TitleCheck();
                     u8 p;
                     u8 newJoins = 0;
+
+                    // F1 toggles input mode (bit 7)
+                    if (pressed & 0x80) {
+                        g_InputMode ^= 1;
+                        Render_TitleMode();
+                    }
+
                     for (p = 0; p < NUM_PLAYERS; p++) {
                         if ((pressed & (1 << p)) && !(ready & (1 << p))) {
                             ready |= (1 << p);
