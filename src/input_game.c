@@ -1,7 +1,7 @@
 // ____________________________________________________________________________
 // Input handling — TiniTetris 4P
 // Two modes selected from the title screen:
-//   KB+JOY:    P1=arrows+Space, P2=WASD+Ctrl, P3=Joy1, P4=Joy2
+//   KB+JOY:    P1=arrows+P, P2=WASD+V, P3=Joy1, P4=Joy2
 //   NINJATAP:  P1-P4 all on NinjaTap adapter
 // ____________________________________________________________________________
 
@@ -17,10 +17,11 @@
 static u8 s_repTimer[NUM_PLAYERS] = { 0, 0, 0, 0 };
 
 // Previous keyboard row states
-static u8 s_prev8  = 0xFF;  // P1: row 8 (arrows + space)
-static u8 s_prevP2_r2 = 0xFF;  // P2: row 2 (A, D)
-static u8 s_prevP2_r4 = 0xFF;  // P2: row 4 (W, S)
-static u8 s_prevP2_r6 = 0xFF;  // P2: row 6 (CTRL)
+static u8 s_prev8  = 0xFF;       // P1: row 8 (arrows)
+static u8 s_prevP1_r4 = 0xFF;    // P1: row 4 (P button)
+static u8 s_prevP2_r2 = 0xFF;    // P2: row 2 (A)
+static u8 s_prevP2_r3 = 0xFF;    // P2: row 3 (D)
+static u8 s_prevP2_r5 = 0xFF;    // P2: row 5 (W, S, V button)
 
 // NinjaTap state
 static u8 s_ntapPorts = 0;
@@ -107,11 +108,13 @@ static void DoJoyPlayer(u8 pNum, u8 joyIdx) {
 }
 
 // ============================================================================
-// Keyboard P1 (arrows + Space = target)
+// Keyboard P1 (arrows + P = target)
+// P key = row 4 bit 5
 // ============================================================================
 
 static void DoKeyboardP1(void) {
     u8 row8 = Keyboard_Read(8);
+    u8 row4 = Keyboard_Read(4);
     u8 l  = !(row8 & 0x10);
     u8 u  = !(row8 & 0x20);
     u8 d  = !(row8 & 0x40);
@@ -122,48 +125,49 @@ static void DoKeyboardP1(void) {
     u8 pr = !(s_prev8 & 0x80);
     DoPlayer(&g_Players[0], 0, l, r, u, d, pl, pr, pu, pd);
     {
-        u8 sp  = !(row8 & 0x01);
-        u8 psp = !(s_prev8 & 0x01);
-        if (sp && !psp)
+        u8 pk  = !(row4 & 0x20);
+        u8 ppk = !(s_prevP1_r4 & 0x20);
+        if (pk && !ppk)
             Player_CycleTarget(&g_Players[0], 0);
     }
     s_prev8 = row8;
+    s_prevP1_r4 = row4;
 }
 
 // ============================================================================
-// Keyboard P2 (WASD + CTRL = target)
-// MSX keyboard matrix: A=row2 bit0, D=row2 bit3, W=row4 bit6, S=row4 bit2,
-//                      CTRL=row6 bit1
+// Keyboard P2 (WASD + V = target)
+// MSX keyboard matrix: A=row2 bit6, D=row3 bit1, W=row5 bit4, S=row5 bit0,
+//                      V=row5 bit3
 // ============================================================================
 
 static void DoKeyboardP2(void) {
     u8 row2 = Keyboard_Read(2);
-    u8 row4 = Keyboard_Read(4);
-    u8 row6 = Keyboard_Read(6);
+    u8 row3 = Keyboard_Read(3);
+    u8 row5 = Keyboard_Read(5);
 
-    u8 l  = !(row2 & 0x01);         // A = left
-    u8 r  = !(row2 & 0x08);         // D = right
-    u8 u  = !(row4 & 0x40);         // W = rotate
-    u8 d  = !(row4 & 0x04);         // S = soft drop
+    u8 l  = !(row2 & 0x40);         // A = left
+    u8 r  = !(row3 & 0x02);         // D = right
+    u8 u  = !(row5 & 0x10);         // W = rotate
+    u8 d  = !(row5 & 0x01);         // S = soft drop
 
-    u8 pl = !(s_prevP2_r2 & 0x01);
-    u8 pr = !(s_prevP2_r2 & 0x08);
-    u8 pu = !(s_prevP2_r4 & 0x40);
-    u8 pd = !(s_prevP2_r4 & 0x04);
+    u8 pl = !(s_prevP2_r2 & 0x40);
+    u8 pr = !(s_prevP2_r3 & 0x02);
+    u8 pu = !(s_prevP2_r5 & 0x10);
+    u8 pd = !(s_prevP2_r5 & 0x01);
 
     DoPlayer(&g_Players[1], 1, l, r, u, d, pl, pr, pu, pd);
 
-    // CTRL = cycle target
+    // V = cycle target
     {
-        u8 ct  = !(row6 & 0x02);
-        u8 pct = !(s_prevP2_r6 & 0x02);
-        if (ct && !pct)
+        u8 v  = !(row5 & 0x08);
+        u8 pv = !(s_prevP2_r5 & 0x08);
+        if (v && !pv)
             Player_CycleTarget(&g_Players[1], 1);
     }
 
     s_prevP2_r2 = row2;
-    s_prevP2_r4 = row4;
-    s_prevP2_r6 = row6;
+    s_prevP2_r3 = row3;
+    s_prevP2_r5 = row5;
 }
 
 // ============================================================================
@@ -172,29 +176,32 @@ static void DoKeyboardP2(void) {
 // Also checks F1 for mode toggle (returned as bit 7).
 // ============================================================================
 
-static u8 s_titlePrev = 0xFF;
-static u8 s_titleKeyPrev = 0xFF;
-static u8 s_titleF1Prev = 0xFF;
+static u8 s_titleR4Prev = 0xFF;   // P1 = P key (row 4 bit 5)
+static u8 s_titleR5Prev = 0xFF;   // P2 = V key (row 5 bit 3)
+static u8 s_titleKeyPrev = 0xFF;  // row 0 (number keys 1-4)
+static u8 s_titleF1Prev = 0xFF;   // row 6 (F1 mode toggle)
 static u8 s_titleJoyPrev[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
 
 u8 Input_TitleCheck(void) {
     u8 result = 0;
-    u8 row8 = Keyboard_Read(8);
+    u8 row4 = Keyboard_Read(4);
     u8 row6 = Keyboard_Read(6);
 
-    // P1: Space (row 8 bit 0)
+    // P1: P key (row 4 bit 5)
     {
-        u8 sp = !(row8 & 0x01);
-        u8 psp = !(s_titlePrev & 0x01);
-        if (sp && !psp) result |= 0x01;
+        u8 pk = !(row4 & 0x20);
+        u8 ppk = !(s_titleR4Prev & 0x20);
+        if (pk && !ppk) result |= 0x01;
     }
-    s_titlePrev = row8;
+    s_titleR4Prev = row4;
 
-    // P2 in KB+JOY mode: CTRL (row 6 bit 1)
+    // P2 in KB+JOY mode: V key (row 5 bit 3)
     if (g_InputMode == 0) {
-        u8 ct = !(row6 & 0x02);
-        u8 pct = !(s_titleF1Prev & 0x02);  // reuse for ctrl prev
-        if (ct && !pct) result |= 0x02;
+        u8 row5 = Keyboard_Read(5);
+        u8 v = !(row5 & 0x08);
+        u8 pv = !(s_titleR5Prev & 0x08);
+        if (v && !pv) result |= 0x02;
+        s_titleR5Prev = row5;
     }
 
     // F1 (row 6 bit 5): mode toggle → bit 7

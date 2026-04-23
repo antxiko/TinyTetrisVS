@@ -99,7 +99,12 @@ You can face up to **3 CPUs at once**. They can team up on you without meaning t
 
 The **Ninja Tap** is a joystick multiplexer that connects to the MSX joystick port and allows up to **4 controllers on a single port**. It was originally designed by the Gigamix team for the MSX scene and remains the standard for multiplayer MSX gaming.
 
-**You NEED a Ninja Tap to play with more than one human player.** Without it, Player 1 uses the keyboard and Players 2-4 are controlled by the AI.
+The game offers two input modes, selected with **F1** on the title screen:
+
+- **KB+JOY** (default): Player 1 and Player 2 play on the keyboard, Players 3 and 4 use standard joysticks (ports 1 and 2).
+- **NINJATAP**: All 4 players use the Ninja Tap adapter — ideal for 3-4 human games on real hardware.
+
+Without a Ninja Tap or joysticks, up to 2 humans can play head-to-head on the keyboard; the other two slots can be filled by the AI.
 
 Compatible Ninja Tap adapters:
 - Original Ninja Tap (Gigamix)
@@ -108,17 +113,28 @@ Compatible Ninja Tap adapters:
 
 ## CONTROLS
 
-### Player 1 — Keyboard
+### Player 1 — Keyboard (KB+JOY mode)
 
 | Key | Action |
 |---|---|
 | **←** **→** | Move piece left / right |
 | **↑** | Rotate piece |
 | **↓** | Soft drop (hold for fast fall) |
-| **SPACE** | Cycle target |
+| **P** | Cycle target |
 | **ESC** | Quit |
 
-### Players 1-4 — Ninja Tap Joystick
+### Player 2 — Keyboard (KB+JOY mode)
+
+| Key | Action |
+|---|---|
+| **A** / **D** | Move piece left / right |
+| **W** | Rotate piece |
+| **S** | Soft drop (hold for fast fall) |
+| **V** | Cycle target |
+
+### Players 3 & 4 — Joystick (KB+JOY mode)
+
+Standard MSX joysticks plugged into ports 1 and 2.
 
 | Input | Action |
 |---|---|
@@ -126,6 +142,25 @@ Compatible Ninja Tap adapters:
 | **Up** | Rotate piece |
 | **Down** | Soft drop (hold for fast fall) |
 | **Button A** | Cycle target |
+
+### Players 1-4 — Ninja Tap Joystick (NINJATAP mode)
+
+| Input | Action |
+|---|---|
+| **Left / Right** | Move piece |
+| **Up** | Rotate piece |
+| **Down** | Soft drop (hold for fast fall) |
+| **Button A** | Cycle target |
+
+### Title Screen
+
+| Key / Input | Action |
+|---|---|
+| **F1** | Toggle input mode (KB+JOY ↔ NINJATAP) |
+| **P** | Player 1 joins as human (keyboard) |
+| **V** | Player 2 joins as human (keyboard, KB+JOY mode) |
+| **Joystick button A** | Join as human in corresponding slot |
+| **1** / **2** / **3** / **4** | Toggle human/CPU for that player slot |
 
 ## WHAT'S ON SCREEN
 
