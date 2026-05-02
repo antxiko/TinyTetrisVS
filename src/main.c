@@ -86,15 +86,19 @@ void main(void) {
                     attract--;
                     if (attract == 0 && ready == 0) break;
                 }
-                if (Keyboard_IsKeyPressed(KEY_ESC)) { Bios_Exit(0); }
+                // ESC ignored on title — there is nowhere to "exit" to from a ROM cartridge
             }
 
             // Commit slot configuration (ready=0 means attract: all CPU)
             g_HumanMask = ready;
 
-            // Show CPU labels for unclaimed slots
+            // Show CPU labels for unclaimed slots — one per VBlank so each
+            // 6-cell label completes inside the safe-write window.
             for (i = 0; i < NUM_PLAYERS; i++) {
-                if (!(ready & (1 << i))) Render_TitleCPU(i);
+                if (!(ready & (1 << i))) {
+                    Halt();
+                    Render_TitleCPU(i);
+                }
             }
 
             // Brief pause (shorter for attract)
@@ -178,10 +182,8 @@ void main(void) {
                 if (row8 != 0xFF) break;  // any key on row 8 pressed
             }
 
-            if (Keyboard_IsKeyPressed(KEY_ESC)) {
-                if (g_HumanMask == 0) break;  // attract → title
-                Bios_Exit(0);                 // real game → quit
-            }
+            if (Keyboard_IsKeyPressed(KEY_ESC))
+                break;  // game/attract → back to title
         }
     }
 }

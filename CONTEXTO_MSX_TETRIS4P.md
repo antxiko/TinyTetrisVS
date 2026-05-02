@@ -11,10 +11,10 @@ Tetris competitivo para 4 jugadores simultáneos en MSX1. Pantalla dividida en 4
 - ROM: 32 KB cartridge (ROM_32K, pages 1-2: 0x4000-0xBFFF)
 
 ## Stack técnico
-- Librería: MSXgl v1.2.17 (C + SDCC)
+- Librería: MSXgl v1.4.1 (C + SDCC)
 - Build: Node.js build system + build.bat auto-sync
 - Emulador: openMSX con NinjaTap emulado
-- Multiplayer: Ninja Tap adapter (Gigamix + MSXgl drivers simultáneos)
+- Multiplayer: Ninja Tap adapter (driver Gigamix DM-System2 vía MSXgl v1.4.1)
 
 ## Arquitectura de rendering
 - **Double-buffer**: g_NameBuffer[768] (RAM shadow de la name table)

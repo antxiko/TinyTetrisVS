@@ -97,7 +97,7 @@ You can face up to **3 CPUs at once**. They can team up on you without meaning t
 
 ### ABOUT THE NINJA TAP
 
-The **Ninja Tap** is a joystick multiplexer that connects to the MSX joystick port and allows up to **4 controllers on a single port**. It was originally designed by the Gigamix team for the MSX scene and remains the standard for multiplayer MSX gaming.
+The **Ninja Tap** is a joystick multiplexer that connects to the MSX joystick port and allows up to **4 controllers on a single port**. The protocol was originally designed by Knight's Chamber / PCCM and popularised by Gigamix's DM-System2; modern clones such as **Xavirompe's NinjaTap-XR** speak the same protocol and work transparently with this game.
 
 The game offers two input modes, selected with **F1** on the title screen:
 
@@ -107,8 +107,9 @@ The game offers two input modes, selected with **F1** on the title screen:
 Without a Ninja Tap or joysticks, up to 2 humans can play head-to-head on the keyboard; the other two slots can be filled by the AI.
 
 Compatible Ninja Tap adapters:
-- Original Ninja Tap (Gigamix)
-- MSXgl-compatible Ninja Tap clones
+- Original Ninja Tap (Gigamix DM-System2)
+- **NinjaTap-XR by Xavirompe** (validated on real MSX1 hardware)
+- Any clone speaking the standard PCCM/Gigamix protocol
 - openMSX emulator with Ninja Tap emulation (`-command "plug joyporta ninjatap"`)
 
 ## CONTROLS
@@ -121,7 +122,7 @@ Compatible Ninja Tap adapters:
 | **↑** | Rotate piece |
 | **↓** | Soft drop (hold for fast fall) |
 | **P** | Cycle target |
-| **ESC** | Quit |
+| **ESC** | Return to title (during a match) |
 
 ### Player 2 — Keyboard (KB+JOY mode)
 
@@ -182,7 +183,7 @@ This entire game fits in a **32 KB cartridge**. On a 1983 computer. Here's what'
 - **Fixed-tile palette** — 27 pre-baked tiles (block, empty, garbage, flash, separator, ghost, dead-letters) replicated across all 3 Screen 2 pattern banks. Board cells cost **1 byte per cell**, not 16.
 - **Ghost piece rendering** using a closed-form landing-y formula with cached column heights — no expensive collision loops
 - **AI opponents** with goal-aware heuristic evaluation (column heights, holes, bumpiness, line completion) — search spread across frames with round-robin scheduling so the frame rate never stalls
-- **NinjaTap driver** supporting both MSXgl and Gigamix protocols simultaneously
+- **NinjaTap driver** using the original Gigamix DM-System2 routine (validated on real MSX1 hardware via MSXgl v1.4.1)
 - **Three PSG tracks**: title-screen theme, in-game Korobeiniki, victory fanfare
 - **Sprite-based targeting system** with 4 hardware sprites, one per attacker
 - **Garbage warfare** with gradual row-by-row rise animation, flash-row-shift correction, and in-flight piece lock-on-garbage (pieces at landing position get locked and carried up with the shift)
@@ -198,7 +199,7 @@ The Z80 runs at 3.58 MHz. The VDP has 16 KB of VRAM. The entire playfield is 32�
 
 ### Prerequisites
 
-- [MSXgl](https://github.com/aoineko-fr/MSXgl) v1.2.17
+- [MSXgl](https://github.com/aoineko-fr/MSXgl) v1.4.1
 - SDCC compiler (included with MSXgl)
 - Windows (build script is a batch file)
 
@@ -239,7 +240,7 @@ openmsx -machine C-BIOS_MSX1_EU -cart tinitetris4p.rom -command "plug joyporta n
 - **AI Assistant** — Claude (Anthropic)
 - **Music** — Korobeiniki (Russian folk song, 1861)
 - **Library** — [MSXgl](https://github.com/aoineko-fr/MSXgl) by Aoineko
-- **Hardware** — Ninja Tap by Gigamix
+- **Hardware** — Ninja Tap protocol by Gigamix / PCCM · NinjaTap-XR by Xavirompe
 
 ---
 

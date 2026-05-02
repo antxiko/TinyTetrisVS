@@ -875,7 +875,7 @@ void Render_TitleMode(void) {
             u8 colD[8];
             for (i = 0; i < 8; i++)
                 colD[i] = (u8)((COLOR_GRAY << 4) | COLOR_BLACK);
-            // "P1:ARROWS P2:WASD P3:J1 P4:J2"
+            // "KEY P1P2  P3P4 JOY"
             PutTileIdentity(10, 23, g_Font['P'-32], colD);
             PutTileIdentity(11, 23, g_Font['1'-32], colD);
             PutTileIdentity(12, 23, g_Font['P'-32], colD);
@@ -884,6 +884,9 @@ void Render_TitleMode(void) {
             PutTileIdentity(16, 23, g_Font['3'-32], colD);
             PutTileIdentity(17, 23, g_Font['P'-32], colD);
             PutTileIdentity(18, 23, g_Font['4'-32], colD);
+            PutTileIdentity(20, 23, g_Font['J'-32], colD);
+            PutTileIdentity(21, 23, g_Font['O'-32], colD);
+            PutTileIdentity(22, 23, g_Font['Y'-32], colD);
         }
     } else {
         // "NTAP"
@@ -895,7 +898,7 @@ void Render_TitleMode(void) {
 }
 
 void Render_TitleCPU(u8 pIdx) {
-    u8 colC[8], colBg[8], i, x;
+    u8 colC[8], colBg[8], i;
     const PlayerColors* pc = &g_PlayerColors[pIdx];
     u8 sx = pIdx * 8;
 
@@ -904,10 +907,12 @@ void Render_TitleCPU(u8 pIdx) {
         colBg[i] = (u8)((COLOR_BLACK << 4) | COLOR_BLACK);
     }
 
-    for (x = sx; x < sx + 8; x++) {
-        PutTileIdentity(x, 21, g_PatEmpty, colBg);
-        PutTileIdentity(x, 22, g_PatEmpty, colBg);
-    }
+    // Erase only the "PRESS" cells (sx+1..sx+5 on row 21) and the "A" cell
+    // (sx+3 on row 22). Avoids 16 redundant clears so the whole label fits
+    // in one VBlank window.
+    PutTileIdentity(sx + 1, 21, g_PatEmpty, colBg);
+    PutTileIdentity(sx + 5, 21, g_PatEmpty, colBg);
+    PutTileIdentity(sx + 3, 22, g_PatEmpty, colBg);
 
     PutTileIdentity(sx + 2, 21, g_Font['C'-32], colC);
     PutTileIdentity(sx + 3, 21, g_Font['P'-32], colC);

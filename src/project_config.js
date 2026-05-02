@@ -38,8 +38,8 @@ Target = "ROM_32K";
 // SIGNATURE SETTINGS
 //*****************************************************************************
 AppSignature = true;
-AppCompany = "TT";
-AppID = "4P";
+AppCompany = "AG";  // Antxiko Gorjon
+AppID = "TT";       // Tiny Tetris
 
 //*****************************************************************************
 // MAKE SETTINGS

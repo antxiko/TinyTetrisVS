@@ -97,10 +97,10 @@ static void DoJoyPlayer(u8 pNum, u8 joyIdx) {
     u8 pd = (g_NTap_Prev[joyIdx] & NTAP_DOWN) == 0;
     DoPlayer(&g_Players[pNum], pNum, l, r, u, d, pl, pr, pu, pd);
 
-    // Physical button A = MSXgl NTAP_B (swapped in library).
+    // Physical A button = bit 7 of g_NTap_Data = NTAP_A.
     // Edge-detect with our own prev to avoid g_NTap_Prev bit 7 issues.
     {
-        u8 btn = NTap_IsPressed(joyIdx, NTAP_B);
+        u8 btn = NTap_IsPressed(joyIdx, NTAP_A);
         if (btn && !s_joyBtnPrev[joyIdx])
             Player_CycleTarget(&g_Players[pNum], pNum);
         s_joyBtnPrev[joyIdx] = btn;
@@ -224,13 +224,13 @@ u8 Input_TitleCheck(void) {
         s_titleKeyPrev = row0;
     }
 
-    // Joystick/NinjaTap players — use NTAP_B (= physical A, swapped in MSXgl)
+    // Joystick/NinjaTap players — read physical A button (NTAP_A = bit 7)
     // with our own edge tracking to avoid g_NTap_Prev bit 7 issues on real HW.
     if (s_ntapPorts >= 2) {
         u8 p;
         NTap_Update();
         for (p = 0; p < 4; p++) {
-            u8 a = NTap_IsPressed(p, NTAP_B);
+            u8 a = NTap_IsPressed(p, NTAP_A);
             u8 pa = s_titleJoyPrev[p];
             if (a && !pa) {
                 // In KB+JOY mode: joy0→P3, joy1→P4

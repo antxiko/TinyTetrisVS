@@ -49,15 +49,16 @@ You need exactly three things:
 │     Great wars have been fought with less.  │
 │                                             │
 │  2. THIS CARTRIDGE                          │
-│     16 KB ROM. Slot it in. Power on.        │
+│     32 KB ROM. Slot it in. Power on.        │
 │     The battlefield loads instantly.        │
 │                                             │
-│  3. A NINJA TAP (for multiplayer)           │
+│  3. A NINJA TAP (for 3-4 humans)            │
 │     Plug it into joystick port A.           │
-│     Connect up to 4 joysticks.             │
-│     Without it, you fight AI alone.         │
-│     With it, you fight your friends.        │
-│     One of those is harder.                 │
+│     Connect up to 4 joysticks.              │
+│     Press F1 on the title screen to enable  │
+│     NinjaTap mode for all four players.     │
+│     Without it: 2 humans on keyboard,       │
+│     up to 2 more on standard joysticks.     │
 └─────────────────────────────────────────────┘
 ```
 
@@ -76,11 +77,16 @@ Below the logo, four player slots await:
   └────────┴────────┴────────┴────────┘
 ```
 
-Each player who wants to fight must press their button to claim their slot:
-- **Player 1**: Press **SPACE** or **1** on keyboard
-- **Player 2**: Press **BUTTON A** on joystick 2, or **2** on keyboard
-- **Player 3**: Press **BUTTON A** on joystick 3, or **3** on keyboard
-- **Player 4**: Press **BUTTON A** on joystick 4, or **4** on keyboard
+Each player who wants to fight must press their button to claim their slot.
+
+**KB+JOY mode** (default — bottom of screen reads `F1: KEY P1P2 P3P4 JOY`):
+- **Player 1**: Press **P** on the keyboard, or **1**
+- **Player 2**: Press **V** on the keyboard, or **2**
+- **Player 3**: Press **BUTTON A** on the joystick in port 1, or **3**
+- **Player 4**: Press **BUTTON A** on the joystick in port 2, or **4**
+
+**NINJATAP mode** (toggle with **F1** — bottom reads `F1: NTAP`):
+- **Players 1–4**: Press **BUTTON A** on the corresponding NinjaTap port (1–4), or use the keyboard number key
 
 When a player joins, their slot changes to **READY** in their player color.
 
@@ -105,7 +111,7 @@ The CPU is no slouch. It evaluates every possible landing, aims for 2-line clear
 
 ## IV. CONTROLS
 
-### KEYBOARD WARRIOR (Player 1)
+### KEYBOARD WARRIOR — PLAYER 1 (KB+JOY mode)
 
 ```
                     ┌───┐
@@ -118,16 +124,33 @@ The CPU is no slouch. It evaluates every possible landing, aims for 2-line clear
                   SOFT DROP
                 (hold to fall fast)
 
-          ┌─────────────────────┐
-          │      S P A C E      │──> CHOOSE YOUR VICTIM
-          └─────────────────────┘
-
-          ┌───┐
-          │ESC│──> RETREAT (quit)
-          └───┘
+                ┌───┐
+                │ P │──> CHOOSE YOUR VICTIM
+                └───┘
 ```
 
-### JOYSTICK SOLDIER (Players 1-4 via Ninja Tap)
+### KEYBOARD WARRIOR — PLAYER 2 (KB+JOY mode)
+
+```
+                    ┌───┐
+     ROTATE ───────>│ W │
+                    └───┘
+          ┌───┐     ┌───┐     ┌───┐
+  MOVE <──│ A │     │ S │     │ D │──> MOVE
+          └───┘     └───┘     └───┘
+                      │
+                  SOFT DROP
+
+                ┌───┐
+                │ V │──> CHOOSE YOUR VICTIM
+                └───┘
+```
+
+### JOYSTICK SOLDIER
+
+In **KB+JOY** mode, players 3 and 4 use the standard joysticks plugged into ports 1 and 2.
+
+In **NINJATAP** mode, all four players use joysticks attached to the NinjaTap on port A.
 
 ```
                     ┌───┐
@@ -145,6 +168,10 @@ The CPU is no slouch. It evaluates every possible landing, aims for 2-line clear
                │ BUTTON A │──> CHOOSE YOUR VICTIM
                └──────────┘
 ```
+
+### ESC — TACTICAL RETREAT
+
+Press **ESC** during a battle to abandon the match and return to the title screen. On the title itself, ESC does nothing — there is nowhere left to retreat to from a cartridge.
 
 ---
 

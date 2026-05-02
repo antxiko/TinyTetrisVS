@@ -6,7 +6,7 @@
 setlocal enabledelayedexpansion
 cls
 
-set MSXGL=C:\Users\Antxiko\Documents\MSXgl-1.2.17
+set MSXGL=C:\Users\Antxiko\Documents\MSXgl-1.4.1
 set PROJ=%MSXGL%\projects\tinitetris4p
 set ROOT=%~dp0
 set SRC=%ROOT%src
@@ -43,11 +43,15 @@ if !BUILD_ERR!==0 (
         set /a NEWVER=!VER!+1
         echo !NEWVER!> "%ROOT%version.txt"
 
-        :: Prune: keep only the 5 most recent versioned ROMs
+        :: Prune: keep only the 5 most recent versioned ROMs.
+        :: Skip tinitetris4p.rom — it's the tracked "latest" pointer and would
+        :: also match tinitetris??.rom (the "4p" passes the "??" mask).
         set COUNT=0
         for /f "delims=" %%f in ('dir /b /o-n "%BUILDS%\tinitetris??.rom" 2^>nul') do (
-            set /a COUNT+=1
-            if !COUNT! GTR 5 del "%BUILDS%\%%f" >nul 2>&1
+            if /I not "%%f"=="tinitetris4p.rom" (
+                set /a COUNT+=1
+                if !COUNT! GTR 5 del "%BUILDS%\%%f" >nul 2>&1
+            )
         )
     )
 )
