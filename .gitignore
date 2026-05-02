@@ -1,2 +1,4 @@
-# Versioned ROMs (keep only tinitetris4p.rom as latest)
+# Versioned ROMs (keep only tinytetris4p.rom as latest)
+builds/tinytetris[0-9][0-9].rom
+# Legacy versioned ROMs from before the rename
 builds/tinitetris[0-9][0-9].rom

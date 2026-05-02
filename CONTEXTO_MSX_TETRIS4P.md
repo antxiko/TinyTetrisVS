@@ -63,8 +63,8 @@ assets/
   korobeiniki.mid  — referencia MIDI del tema
   msx_tetris4p.html — prototipo visual original
 builds/
-  tinitetris4p.rom — última build
-  tinitetrisNN.rom — builds versionadas (auto-prune a 5)
+  tinytetris4p.rom — última build
+  tinytetrisNN.rom — builds versionadas (auto-prune a 5)
 ```
 
 ## Paleta por jugador

@@ -217,7 +217,7 @@ The script syncs sources to the MSXgl project tree, compiles, and copies the ver
 ### Running in openMSX
 
 ```bash
-openmsx -machine C-BIOS_MSX1_EU -cart tinitetris4p.rom -command "plug joyporta ninjatap"
+openmsx -machine C-BIOS_MSX1_EU -cart tinytetris4p.rom -command "plug joyporta ninjatap"
 ```
 
 ## THE STORY

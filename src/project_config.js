@@ -20,7 +20,7 @@ Emulator  = "C:\\Program Files\\openMSX\\openmsx.exe";
 //*****************************************************************************
 // PROJECT SETTINGS
 //*****************************************************************************
-ProjName = "tinitetris4p";
+ProjName = "tinytetris4p";
 
 // Source modules (without .c extension)
 ProjModules = [ "main", "game", "render", "input_game", "music" ];
