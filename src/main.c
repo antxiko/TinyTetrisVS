@@ -38,8 +38,11 @@ void main(void) {
 
     Bios_SetKeyClick(FALSE);
     Render_Init();
-    VDP_EnableVBlank(TRUE);
+    // Detect NinjaTap BEFORE enabling VBlank — Crawlers does the same.
+    // With VBlank active the BIOS ISR scans the keyboard via the PSG and
+    // can corrupt the detection sequence on real MSX1 hardware.
     Input_Init();
+    VDP_EnableVBlank(TRUE);
 
     // === MAIN LOOP: Title → Game → Victory → repeat ===
     while (1) {
@@ -176,10 +179,12 @@ void main(void) {
                 break;
             }
 
-            // Attract mode: any key → back to title
-            if (g_HumanMask == 0) {
+            // Attract mode: any key → back to title (KB+JOY only — in
+            // NinjaTap mode we never touch the keyboard during a match
+            // except for ESC, to keep the PSG bus exclusive to the tap).
+            if (g_HumanMask == 0 && g_InputMode == 0) {
                 u8 row8 = Keyboard_Read(8);
-                if (row8 != 0xFF) break;  // any key on row 8 pressed
+                if (row8 != 0xFF) break;
             }
 
             if (Keyboard_IsKeyPressed(KEY_ESC))

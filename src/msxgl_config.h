@@ -313,7 +313,7 @@
 //-----------------------------------------------------------------------------
 // NINJATAP MODULE
 //-----------------------------------------------------------------------------
-#define NTAP_DRIVER					NTAP_DRIVER_GIGAMIX
+#define NTAP_DRIVER					NTAP_DRIVER_MSXGL | NTAP_DRIVER_GIGAMIX | NTAP_DRIVER_SHINOBI
 #define NTAP_USE_PREVIOUS			TRUE
 
 //-----------------------------------------------------------------------------

@@ -244,4 +244,18 @@ openmsx -machine C-BIOS_MSX1_EU -cart tinytetris4p.rom -command "plug joyporta n
 
 ---
 
+## CHANGELOG
+
+### v1.1
+- **NinjaTap reliability fix on real MSX1 hardware.** The PSG mixer (R#7) was being initialised with port B as input, which silently broke the joystick output pulses required to clock the tap's 4021 shift registers. Set port B to output as the BIOS expects.
+- Init order: `NTap_Check` now runs before `VDP_EnableVBlank` so the BIOS keyboard scan ISR cannot interfere with detection.
+- Keyboard polling completely suppressed during NinjaTap gameplay (only ESC remains) so the PSG bus is exclusive to the tap.
+- NinjaTap driver now tries MSXgl, Gigamix, and Shinobi flavours (matches Crawlers' configuration).
+- Player input loop bound to the actual detected port count instead of always reading slots 0–3.
+
+### v1.0
+- Initial public release.
+
+---
+
 *Tiny Tetris VS — Because 32 KB is all you need to destroy friendships.*

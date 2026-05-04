@@ -80,31 +80,23 @@ static void DoPlayer(Player* p, u8 pNum,
 
 // ============================================================================
 // NinjaTap / standard joystick → DoPlayer
+// Mirrors the Crawlers approach: trust MSXgl's NTap_IsPressed/IsPushed and
+// use g_NTap_Prev for edge detection. No homebrew button tracking.
 // ============================================================================
-
-// Own button-state tracking — g_NTap_Prev bit 7 is unreliable on some
-// real NinjaTap hardware, so we track the physical A button ourselves.
-static u8 s_joyBtnPrev[4] = { 0, 0, 0, 0 };
 
 static void DoJoyPlayer(u8 pNum, u8 joyIdx) {
     u8 l  = NTap_IsPressed(joyIdx, NTAP_LEFT);
     u8 r  = NTap_IsPressed(joyIdx, NTAP_RIGHT);
     u8 u  = NTap_IsPressed(joyIdx, NTAP_UP);
     u8 d  = NTap_IsPressed(joyIdx, NTAP_DOWN);
-    u8 pl = (g_NTap_Prev[joyIdx] & NTAP_LEFT) == 0;
+    u8 pl = (g_NTap_Prev[joyIdx] & NTAP_LEFT)  == 0;
     u8 pr = (g_NTap_Prev[joyIdx] & NTAP_RIGHT) == 0;
-    u8 pu = (g_NTap_Prev[joyIdx] & NTAP_UP) == 0;
-    u8 pd = (g_NTap_Prev[joyIdx] & NTAP_DOWN) == 0;
+    u8 pu = (g_NTap_Prev[joyIdx] & NTAP_UP)    == 0;
+    u8 pd = (g_NTap_Prev[joyIdx] & NTAP_DOWN)  == 0;
     DoPlayer(&g_Players[pNum], pNum, l, r, u, d, pl, pr, pu, pd);
 
-    // Physical A button = bit 7 of g_NTap_Data = NTAP_A.
-    // Edge-detect with our own prev to avoid g_NTap_Prev bit 7 issues.
-    {
-        u8 btn = NTap_IsPressed(joyIdx, NTAP_A);
-        if (btn && !s_joyBtnPrev[joyIdx])
-            Player_CycleTarget(&g_Players[pNum], pNum);
-        s_joyBtnPrev[joyIdx] = btn;
-    }
+    if (NTap_IsPushed(joyIdx, NTAP_A))
+        Player_CycleTarget(&g_Players[pNum], pNum);
 }
 
 // ============================================================================
@@ -180,8 +172,6 @@ static u8 s_titleR4Prev = 0xFF;   // P1 = P key (row 4 bit 5)
 static u8 s_titleR5Prev = 0xFF;   // P2 = V key (row 5 bit 3)
 static u8 s_titleKeyPrev = 0xFF;  // row 0 (number keys 1-4)
 static u8 s_titleF1Prev = 0xFF;   // row 6 (F1 mode toggle)
-static u8 s_titleJoyPrev[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
-
 u8 Input_TitleCheck(void) {
     u8 result = 0;
     u8 row4 = Keyboard_Read(4);
@@ -224,23 +214,23 @@ u8 Input_TitleCheck(void) {
         s_titleKeyPrev = row0;
     }
 
-    // Joystick/NinjaTap players — read physical A button (NTAP_A = bit 7)
-    // with our own edge tracking to avoid g_NTap_Prev bit 7 issues on real HW.
-    if (s_ntapPorts >= 2) {
-        u8 p;
-        NTap_Update();
-        for (p = 0; p < 4; p++) {
-            u8 a = NTap_IsPressed(p, NTAP_A);
-            u8 pa = s_titleJoyPrev[p];
-            if (a && !pa) {
-                // In KB+JOY mode: joy0→P3, joy1→P4
-                // In NINJATAP mode: joy0→P1, joy1→P2, joy2→P3, joy3→P4
+    // Joystick/NinjaTap players — only iterate ports actually detected.
+    // Crawlers does the same: bound the loop by the real port count so
+    // we never read garbage from g_NTap_Data slots that were never
+    // populated by GETJOY/GETNIN.
+    NTap_Update();
+    {
+        u8 p, lim = s_ntapPorts;
+        if (lim > 4) lim = 4;
+        for (p = 0; p < lim; p++) {
+            if (NTap_IsPushed(p, NTAP_A)) {
+                // KB+JOY mode: joy0→P3, joy1→P4
+                // NINJATAP mode: joy0→P1, joy1→P2, joy2→P3, joy3→P4
                 if (g_InputMode == 0)
-                    result |= (u8)(1 << (p + 2));  // P3=bit2, P4=bit3
+                    result |= (u8)(1 << (p + 2));
                 else
                     result |= (u8)(1 << p);
             }
-            s_titleJoyPrev[p] = a;
         }
     }
 
@@ -252,19 +242,19 @@ u8 Input_TitleCheck(void) {
 // ============================================================================
 
 void Input_GameUpdate(void) {
+    NTap_Update();
     if (g_InputMode == 0) {
         // KB+JOY mode: P1=keyboard, P2=WASD, P3/P4=standard joysticks
         if (g_HumanMask & 0x01) DoKeyboardP1();
         if (g_HumanMask & 0x02) DoKeyboardP2();
-        if (s_ntapPorts >= 2) {
-            NTap_Update();
+        if (s_ntapPorts >= 1) {
             if (g_HumanMask & 0x04) DoJoyPlayer(2, 0);  // P3 = joy port A
-            if (g_HumanMask & 0x08) DoJoyPlayer(3, 1);  // P4 = joy port B
+            if (s_ntapPorts >= 2 && (g_HumanMask & 0x08))
+                DoJoyPlayer(3, 1);  // P4 = joy port B
         }
     } else {
-        // NINJATAP mode: all 4 on NinjaTap
-        if (s_ntapPorts >= 2) {
-            NTap_Update();
+        // NINJATAP mode: all 4 on NinjaTap (gated by detected port count)
+        if (s_ntapPorts >= 5) {
             if (g_HumanMask & 0x01) DoJoyPlayer(0, 0);
             if (g_HumanMask & 0x02) DoJoyPlayer(1, 1);
             if (g_HumanMask & 0x04) DoJoyPlayer(2, 2);

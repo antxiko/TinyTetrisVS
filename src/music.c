@@ -209,7 +209,11 @@ static void ResetPlayback(void) {
 }
 
 void Music_Init(void) {
-    PSG_SetRegister(7, 0x3C);  // tone A+B enabled
+    // R#7 mixer: tone A+B enabled, all noise disabled, port A input,
+    // port B OUTPUT (bit 7 = 1) — required so the joystick output
+    // pulses written to R#15 by NTap_Update actually reach the pins.
+    // Using 0x3C here would zero bit 7 and break NinjaTap on real HW.
+    PSG_SetRegister(7, 0xBC);
     PSG_SetRegister(8, 12);
     PSG_SetRegister(9, 9);
     PSG_SetRegister(10, 0);

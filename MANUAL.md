@@ -382,4 +382,4 @@ The **Korobeiniki** — a Russian folk song from 1861 — plays endlessly throug
 
 ---
 
-*Tiny Tetris VS — 32 KB of friendship destruction since 2026.*
+*Tiny Tetris VS v1.1 — 32 KB of friendship destruction since 2026.*
